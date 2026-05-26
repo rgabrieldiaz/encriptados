@@ -74,8 +74,34 @@
 
       <!-- SECCIÓN DEL CALENDARIO CENTRAL (Z-depth medio) -->
       <section class="calendar-container">
-        <!-- Encabezado de los días de la semana -->
-        <div class="calendar-days-header">
+        <!-- Barra de Controles: Selector de Vista y Navegación Diaria -->
+        <div class="calendar-controls">
+          <!-- Navegación Diaria (Solo visible en Vista Diaria) -->
+          <div class="day-navigation" id="day-navigation">
+            <button class="nav-btn prev-day-btn" id="prev-day-btn" aria-label="Día anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <h2 class="active-day-title" id="active-day-title">Detectando fecha...</h2>
+            <button class="nav-btn next-day-btn" id="next-day-btn" aria-label="Siguiente día">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Selector de Vista Segmentado -->
+          <div class="view-switcher" id="view-switcher">
+            <div class="switcher-slider" id="switcher-slider"></div>
+            <button class="view-tab active" data-view="diario">DIARIO</button>
+            <button class="view-tab" data-view="semanal">SEMANAL</button>
+            <button class="view-tab" data-view="mensual">MENSUAL</button>
+          </div>
+        </div>
+
+        <!-- Encabezado de los días de la semana (Vista Semanal) -->
+        <div class="calendar-days-header" id="calendar-days-header">
           <div class="day-label-col">MON</div>
           <div class="day-label-col">TUE</div>
           <div class="day-label-col">WED</div>
@@ -122,6 +148,11 @@
             <div class="column-bg-glow"></div>
             <div class="events-wrapper"></div>
           </div>
+        </div>
+
+        <!-- Grilla para Vista Mensual (Oculta por defecto) -->
+        <div class="calendar-month-grid" id="calendar-month-grid">
+          <!-- Celdas del mes generadas dinámicamente -->
         </div>
       </section>
 
