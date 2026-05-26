@@ -8,7 +8,22 @@ const state = {
   currentCityName: "Buenos Aires (AMBA)",
   events: [],
   userCalendar: JSON.parse(localStorage.getItem('encriptados_calendar')) || [],
-  mouse: { x: 0, y: 0, targetX: 0, targetY: 0 }
+  mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
+  currentView: "diario", // 'diario', 'semanal', 'mensual'
+  activeDay: "MON"       // MON, TUE, WED, THU, FRI, SAT, SUN
+};
+
+// Constantes para Navegación Diaria
+const daysOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+const dayTitleMap = {
+  MON: "LUNES, 25 DE MAYO",
+  TUE: "MARTES, 26 DE MAYO",
+  WED: "MIÉRCOLES, 27 DE MAYO",
+  THU: "JUEVES, 28 DE MAYO",
+  FRI: "VIERNES, 29 DE MAYO",
+  SAT: "SÁBADO, 30 DE MAYO",
+  SUN: "DOMINGO, 31 DE MAYO"
 };
 
 // Mapeo de nombres completos de días de la semana para mobile
@@ -42,7 +57,18 @@ const dom = {
   modalDescription: document.getElementById('modal-description'),
   modalAddBtn: document.getElementById('modal-add-btn'),
   toastContainer: document.getElementById('toast-container'),
-  canvas: document.getElementById('space-canvas')
+  canvas: document.getElementById('space-canvas'),
+  
+  // Nuevos selectores para la barra de controles
+  viewSwitcher: document.getElementById('view-switcher'),
+  viewTabs: document.querySelectorAll('.view-tab'),
+  switcherSlider: document.getElementById('switcher-slider'),
+  dayNavigation: document.getElementById('day-navigation'),
+  activeDayTitle: document.getElementById('active-day-title'),
+  prevDayBtn: document.getElementById('prev-day-btn'),
+  nextDayBtn: document.getElementById('next-day-btn'),
+  calendarDaysHeader: document.getElementById('calendar-days-header'),
+  monthGrid: document.getElementById('calendar-month-grid')
 };
 
 // ==========================================================================
@@ -276,6 +302,13 @@ function renderEvents() {
 
   // Ajustar inclinación individual de tarjetas en 3D
   setupCard3DInteractions();
+
+  // Sincronizar la vista activa al recargar eventos
+  if (state.currentView === 'mensual') {
+    renderMonthGrid();
+  } else if (state.currentView === 'diario') {
+    updateActiveDayColumn();
+  }
 }
 
 /**
@@ -396,6 +429,206 @@ function setupCard3DInteractions() {
       card.style.borderColor = 'rgba(255, 255, 255, 0.07)';
     });
   });
+}
+
+// ==========================================================================
+// CONTROL DE VISTAS (DIARIO, SEMANAL, MENSUAL) Y NAVEGACIÓN
+// ==========================================================================
+
+function initViewSwitcher() {
+  if (!dom.viewSwitcher) return;
+
+  dom.viewTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const view = tab.getAttribute('data-view');
+      switchView(view);
+    });
+  });
+
+  // Ajustar slider al redimensionar pantalla
+  window.addEventListener('resize', () => {
+    updateSwitcherSlider();
+  });
+  
+  // Ajuste inicial para posicionar el slider neón sobre la tab por defecto (Diario)
+  setTimeout(updateSwitcherSlider, 100);
+}
+
+function updateSwitcherSlider() {
+  const activeTab = Array.from(dom.viewTabs).find(tab => tab.classList.contains('active'));
+  if (activeTab && dom.switcherSlider) {
+    dom.switcherSlider.style.left = `${activeTab.offsetLeft}px`;
+    dom.switcherSlider.style.width = `${activeTab.offsetWidth}px`;
+  }
+}
+
+function switchView(viewName) {
+  state.currentView = viewName;
+
+  // Actualizar clases activas en pestañas
+  dom.viewTabs.forEach(tab => {
+    if (tab.getAttribute('data-view') === viewName) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+
+  updateSwitcherSlider();
+
+  // Mostrar / Ocultar componentes según la vista seleccionada
+  if (viewName === 'diario') {
+    dom.dayNavigation.classList.remove('hidden');
+    dom.calendarDaysHeader.style.display = 'none';
+    dom.calendarGrid.style.display = 'grid';
+    dom.monthGrid.classList.remove('active');
+
+    dom.calendarGrid.className = 'calendar-grid view-diario';
+    
+    // Activar la columna correspondiente
+    updateActiveDayColumn();
+  } else if (viewName === 'semanal') {
+    dom.dayNavigation.classList.add('hidden');
+    // En mobile ocultamos la cabecera semanal por CSS, en desktop la mostramos
+    if (window.innerWidth > 768) {
+      dom.calendarDaysHeader.style.display = 'grid';
+    } else {
+      dom.calendarDaysHeader.style.display = 'none';
+    }
+    dom.calendarGrid.style.display = 'grid';
+    dom.monthGrid.classList.remove('active');
+
+    dom.calendarGrid.className = 'calendar-grid view-semanal';
+
+    // Asegurarse de que todas las columnas de días se muestren (limpiar active-day-col)
+    dom.columns.forEach(col => {
+      col.classList.remove('active-day-col');
+    });
+  } else if (viewName === 'mensual') {
+    dom.dayNavigation.classList.add('hidden');
+    dom.calendarDaysHeader.style.display = 'none';
+    dom.calendarGrid.style.display = 'none';
+    dom.monthGrid.classList.add('active');
+
+    renderMonthGrid();
+  }
+
+  // Recalcular interacciones 3D para adaptarlas
+  setupCard3DInteractions();
+}
+
+function updateActiveDayColumn() {
+  dom.columns.forEach(col => {
+    const day = col.getAttribute('data-day');
+    if (day === state.activeDay) {
+      col.classList.add('active-day-col');
+    } else {
+      col.classList.remove('active-day-col');
+    }
+  });
+
+  if (dom.activeDayTitle) {
+    dom.activeDayTitle.textContent = dayTitleMap[state.activeDay];
+  }
+}
+
+function initDayNavigation() {
+  if (!dom.prevDayBtn || !dom.nextDayBtn) return;
+
+  dom.prevDayBtn.addEventListener('click', () => {
+    navigateDay(-1);
+  });
+
+  dom.nextDayBtn.addEventListener('click', () => {
+    navigateDay(1);
+  });
+}
+
+function navigateDay(direction) {
+  const currentIndex = daysOrder.indexOf(state.activeDay);
+  let newIndex = currentIndex + direction;
+
+  if (newIndex < 0) {
+    newIndex = daysOrder.length - 1;
+  } else if (newIndex >= daysOrder.length) {
+    newIndex = 0;
+  }
+
+  state.activeDay = daysOrder[newIndex];
+  updateActiveDayColumn();
+}
+
+function renderMonthGrid() {
+  if (!dom.monthGrid) return;
+
+  dom.monthGrid.innerHTML = '';
+
+  // Configurar mes: Mayo 2026
+  // Mayo 2026 empieza en un viernes. 
+  // En nuestro layout, los días de la semana son Lun, Mar, Mié, Jue, Vie, Sáb, Dom.
+  // Así que lunes 27 de abril a jueves 30 de abril son del mes anterior (4 días inactivos).
+  // Mayo tiene 31 días.
+  // Total celdas: 4 (inactivas) + 31 (activas) = 35 celdas.
+
+  const inactiveDaysBefore = 4;
+  const totalDaysInMonth = 31;
+  const totalCells = 35;
+
+  for (let i = 0; i < totalCells; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'month-cell';
+
+    const dayOfWeek = daysOrder[i % 7];
+
+    if (i < inactiveDaysBefore) {
+      cell.classList.add('inactive');
+      const dayNum = 27 + i; // 27, 28, 29, 30
+      cell.innerHTML = `<span class="month-day-num">${dayNum}</span>`;
+    } else {
+      const dayNum = i - inactiveDaysBefore + 1;
+      cell.setAttribute('data-day-num', dayNum);
+      cell.setAttribute('data-day-of-week', dayOfWeek);
+
+      const dayNumSpan = document.createElement('span');
+      dayNumSpan.className = 'month-day-num';
+      dayNumSpan.textContent = dayNum;
+      cell.appendChild(dayNumSpan);
+
+      // Simulamos que hoy es 25 de Mayo (para que coincida con nuestros mocks)
+      if (dayNum === 25) {
+        cell.classList.add('today');
+      }
+
+      // Filtrar eventos para este día
+      if (dayNum >= 25 && dayNum <= 31) {
+        const dayEvents = state.events.filter(e => e.dayOfWeek === dayOfWeek);
+
+        if (dayEvents.length > 0) {
+          cell.classList.add('has-events');
+
+          const dotsContainer = document.createElement('div');
+          dotsContainer.className = 'month-cell-events';
+
+          dayEvents.forEach(event => {
+            const dot = document.createElement('span');
+            const mainTag = event.tags[0].toLowerCase();
+            dot.className = `month-event-dot dot-${mainTag}`;
+            dotsContainer.appendChild(dot);
+          });
+
+          cell.appendChild(dotsContainer);
+        }
+      }
+
+      // Al hacer clic, ir a la vista diaria de ese día
+      cell.addEventListener('click', () => {
+        state.activeDay = dayOfWeek;
+        switchView('diario');
+      });
+    }
+
+    dom.monthGrid.appendChild(cell);
+  }
 }
 
 // ==========================================================================
@@ -626,6 +859,10 @@ async function initApp() {
   // 3. Iniciar Dropdown de región
   initLocationDropdown();
 
+  // Iniciar Selector de Vistas y Navegación Diaria
+  initViewSwitcher();
+  initDayNavigation();
+
   // 4. Configurar eventos de cierre del modal
   dom.modalCloseBtn.addEventListener('click', closeEventModal);
   dom.eventModal.addEventListener('click', (e) => {
@@ -667,6 +904,9 @@ async function initApp() {
 
   // 6. Cargar eventos iniciales filtrados por ubicación detectada
   await loadEventsByCity(state.currentCity);
+
+  // 7. Inicializar la vista predeterminada (Diario)
+  switchView(state.currentView);
 }
 
 // Arrancar cuando el DOM esté listo
