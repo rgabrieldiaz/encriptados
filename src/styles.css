@@ -513,7 +513,7 @@ body {
 .calendar-month-grid {
   display: none;
   grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
+  gap: 14px;
   margin-top: 10px;
   animation: fadeInMonth 0.5s ease-out;
 }

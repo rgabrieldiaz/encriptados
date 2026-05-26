@@ -3,6 +3,9 @@ import { getEvents, detectUserLocation } from './api/events.js';
 // ==========================================================================
 // ESTADO GLOBAL DE LA APLICACIÓN
 // ==========================================================================
+// Constantes para Navegación Diaria
+const daysOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
 const state = {
   currentCity: "AMBA",
   currentCityName: "Buenos Aires (AMBA)",
@@ -10,21 +13,48 @@ const state = {
   userCalendar: JSON.parse(localStorage.getItem('encriptados_calendar')) || [],
   mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
   currentView: "diario", // 'diario', 'semanal', 'mensual'
-  activeDay: "MON"       // MON, TUE, WED, THU, FRI, SAT, SUN
+  activeDay: daysOrder[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1],
+  referenceDate: new Date(), // Fecha enfocada por el calendario
+  currentDate: new Date()    // Fecha de hoy real de su sistema
 };
 
-// Constantes para Navegación Diaria
-const daysOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+let weekDates = {};
+const dayTitleMap = {};
 
-const dayTitleMap = {
-  MON: "LUNES, 25 DE MAYO",
-  TUE: "MARTES, 26 DE MAYO",
-  WED: "MIÉRCOLES, 27 DE MAYO",
-  THU: "JUEVES, 28 DE MAYO",
-  FRI: "VIERNES, 29 DE MAYO",
-  SAT: "SÁBADO, 30 DE MAYO",
-  SUN: "DOMINGO, 31 DE MAYO"
-};
+function getMondayOfDate(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function recalculateWeek() {
+  const monday = getMondayOfDate(state.referenceDate);
+  const monthsSpanish = [
+    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+  ];
+  const daysSpanish = [
+    "DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"
+  ];
+
+  daysOrder.forEach((day, idx) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + idx);
+    weekDates[day] = d;
+
+    const dayName = daysSpanish[d.getDay()];
+    const dayNum = d.getDate();
+    const monthName = monthsSpanish[d.getMonth()];
+    dayTitleMap[day] = `${dayName}, ${dayNum} DE ${monthName}`;
+  });
+}
+
+// Inicializar fechas
+recalculateWeek();
 
 // Mapeo de nombres completos de días de la semana para mobile
 const dayNameMap = {
@@ -257,7 +287,7 @@ async function loadEventsByCity(city) {
   dom.calendarGrid.style.transition = 'all 0.3s ease';
 
   try {
-    const events = await getEvents(city);
+    const events = await getEvents(city, state.referenceDate);
     state.events = events;
     renderEvents();
   } catch (error) {
@@ -488,7 +518,7 @@ function switchView(viewName) {
     // Activar la columna correspondiente
     updateActiveDayColumn();
   } else if (viewName === 'semanal') {
-    dom.dayNavigation.classList.add('hidden');
+    dom.dayNavigation.classList.remove('hidden'); // Mostrar navegación
     // En mobile ocultamos la cabecera semanal por CSS, en desktop la mostramos
     if (window.innerWidth > 768) {
       dom.calendarDaysHeader.style.display = 'grid';
@@ -505,13 +535,16 @@ function switchView(viewName) {
       col.classList.remove('active-day-col');
     });
   } else if (viewName === 'mensual') {
-    dom.dayNavigation.classList.add('hidden');
-    dom.calendarDaysHeader.style.display = 'none';
+    dom.dayNavigation.classList.remove('hidden'); // Mostrar navegación
+    dom.calendarDaysHeader.style.display = 'grid'; // Mostrar cabecera Lun, Mar... encima de la grilla mensual
     dom.calendarGrid.style.display = 'none';
     dom.monthGrid.classList.add('active');
 
     renderMonthGrid();
   }
+
+  // Actualizar el título de la navegación según la vista
+  updateNavigationTitle();
 
   // Recalcular interacciones 3D para adaptarlas
   setupCard3DInteractions();
@@ -527,35 +560,123 @@ function updateActiveDayColumn() {
     }
   });
 
-  if (dom.activeDayTitle) {
-    dom.activeDayTitle.textContent = dayTitleMap[state.activeDay];
-  }
+  updateNavigationTitle();
 }
 
 function initDayNavigation() {
   if (!dom.prevDayBtn || !dom.nextDayBtn) return;
 
   dom.prevDayBtn.addEventListener('click', () => {
-    navigateDay(-1);
+    navigateCalendar(-1);
   });
 
   dom.nextDayBtn.addEventListener('click', () => {
-    navigateDay(1);
+    navigateCalendar(1);
   });
 }
 
-function navigateDay(direction) {
-  const currentIndex = daysOrder.indexOf(state.activeDay);
-  let newIndex = currentIndex + direction;
+async function navigateCalendar(direction) {
+  if (state.currentView === 'diario') {
+    const currentIndex = daysOrder.indexOf(state.activeDay);
+    let newIndex = currentIndex + direction;
 
-  if (newIndex < 0) {
-    newIndex = daysOrder.length - 1;
-  } else if (newIndex >= daysOrder.length) {
-    newIndex = 0;
+    if (newIndex < 0) {
+      // Retroceder 1 semana
+      state.referenceDate.setDate(state.referenceDate.getDate() - 7);
+      recalculateWeek();
+      state.activeDay = 'SUN';
+      await loadEventsForCurrentWeek();
+    } else if (newIndex >= daysOrder.length) {
+      // Avanzar 1 semana
+      state.referenceDate.setDate(state.referenceDate.getDate() + 7);
+      recalculateWeek();
+      state.activeDay = 'MON';
+      await loadEventsForCurrentWeek();
+    } else {
+      state.activeDay = daysOrder[newIndex];
+      updateActiveDayColumn();
+    }
+  } else if (state.currentView === 'semanal') {
+    // Avanzar/Retroceder 1 semana
+    state.referenceDate.setDate(state.referenceDate.getDate() + (direction * 7));
+    recalculateWeek();
+    await loadEventsForCurrentWeek();
+  } else if (state.currentView === 'mensual') {
+    // Avanzar/Retroceder 1 mes
+    state.referenceDate.setMonth(state.referenceDate.getMonth() + direction);
+    state.referenceDate.setDate(1); // Día 1 seguro
+    recalculateWeek();
+    await loadEventsForCurrentWeek();
   }
+}
 
-  state.activeDay = daysOrder[newIndex];
-  updateActiveDayColumn();
+async function loadEventsForCurrentWeek() {
+  await loadEventsByCity(state.currentCity);
+  renderWeekDaysHeader();
+  if (state.currentView === 'diario') {
+    updateActiveDayColumn();
+  } else if (state.currentView === 'mensual') {
+    renderMonthGrid();
+  }
+  updateNavigationTitle();
+}
+
+function renderWeekDaysHeader() {
+  if (!dom.calendarDaysHeader) return;
+  const headers = dom.calendarDaysHeader.querySelectorAll('.day-label-col');
+  daysOrder.forEach((day, index) => {
+    if (headers[index]) {
+      if (state.currentView === 'mensual') {
+        headers[index].innerHTML = day;
+      } else {
+        const d = weekDates[day];
+        const dayNum = d.getDate();
+        headers[index].innerHTML = `${day} <span class="header-day-num" style="color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 255, 255, 0.3); font-size: 14px; display: block; margin-top: 4px;">${dayNum}</span>`;
+      }
+    }
+  });
+}
+
+function updateNavigationTitle() {
+  if (!dom.activeDayTitle) return;
+
+  const monthsSpanish = [
+    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+  ];
+  const daysSpanish = [
+    "DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"
+  ];
+
+  if (state.currentView === 'diario') {
+    const d = weekDates[state.activeDay];
+    if (d) {
+      const dayName = daysSpanish[d.getDay()];
+      const dayNum = d.getDate();
+      const monthName = monthsSpanish[d.getMonth()];
+      dom.activeDayTitle.textContent = `${dayName}, ${dayNum} DE ${monthName}`;
+    }
+  } else if (state.currentView === 'semanal') {
+    const mon = weekDates['MON'];
+    const sun = weekDates['SUN'];
+    if (mon && sun) {
+      const monNum = mon.getDate();
+      const monMonth = monthsSpanish[mon.getMonth()];
+      const sunNum = sun.getDate();
+      const sunMonth = monthsSpanish[sun.getMonth()];
+      const year = mon.getFullYear();
+
+      if (mon.getMonth() === sun.getMonth()) {
+        dom.activeDayTitle.textContent = `SEMANA DEL ${monNum} AL ${sunNum} DE ${monMonth} ${year}`;
+      } else {
+        dom.activeDayTitle.textContent = `SEMANA DEL ${monNum} DE ${monMonth} AL ${sunNum} DE ${sunMonth} ${year}`;
+      }
+    }
+  } else if (state.currentView === 'mensual') {
+    const year = state.referenceDate.getFullYear();
+    const monthName = monthsSpanish[state.referenceDate.getMonth()];
+    dom.activeDayTitle.textContent = `${monthName} ${year}`;
+  }
 }
 
 function renderMonthGrid() {
@@ -563,16 +684,18 @@ function renderMonthGrid() {
 
   dom.monthGrid.innerHTML = '';
 
-  // Configurar mes: Mayo 2026
-  // Mayo 2026 empieza en un viernes. 
-  // En nuestro layout, los días de la semana son Lun, Mar, Mié, Jue, Vie, Sáb, Dom.
-  // Así que lunes 27 de abril a jueves 30 de abril son del mes anterior (4 días inactivos).
-  // Mayo tiene 31 días.
-  // Total celdas: 4 (inactivas) + 31 (activas) = 35 celdas.
+  const year = state.referenceDate.getFullYear();
+  const month = state.referenceDate.getMonth();
 
-  const inactiveDaysBefore = 4;
-  const totalDaysInMonth = 31;
-  const totalCells = 35;
+  const firstDay = new Date(year, month, 1);
+  let inactiveDaysBefore = firstDay.getDay() - 1;
+  if (inactiveDaysBefore < 0) inactiveDaysBefore = 6;
+
+  const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+  const totalDaysInPrevMonth = new Date(year, month, 0).getDate();
+  const prevMonthStartDay = totalDaysInPrevMonth - inactiveDaysBefore + 1;
+
+  const totalCells = Math.ceil((inactiveDaysBefore + totalDaysInMonth) / 7) * 7;
 
   for (let i = 0; i < totalCells; i++) {
     const cell = document.createElement('div');
@@ -582,10 +705,16 @@ function renderMonthGrid() {
 
     if (i < inactiveDaysBefore) {
       cell.classList.add('inactive');
-      const dayNum = 27 + i; // 27, 28, 29, 30
+      const dayNum = prevMonthStartDay + i;
+      cell.innerHTML = `<span class="month-day-num">${dayNum}</span>`;
+    } else if (i >= inactiveDaysBefore + totalDaysInMonth) {
+      cell.classList.add('inactive');
+      const dayNum = i - (inactiveDaysBefore + totalDaysInMonth) + 1;
       cell.innerHTML = `<span class="month-day-num">${dayNum}</span>`;
     } else {
       const dayNum = i - inactiveDaysBefore + 1;
+      const cellDate = new Date(year, month, dayNum);
+
       cell.setAttribute('data-day-num', dayNum);
       cell.setAttribute('data-day-of-week', dayOfWeek);
 
@@ -594,36 +723,43 @@ function renderMonthGrid() {
       dayNumSpan.textContent = dayNum;
       cell.appendChild(dayNumSpan);
 
-      // Simulamos que hoy es 25 de Mayo (para que coincida con nuestros mocks)
-      if (dayNum === 25) {
+      // Resaltar si es hoy real (día de hoy en el sistema)
+      const today = new Date();
+      if (dayNum === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
         cell.classList.add('today');
       }
 
-      // Filtrar eventos para este día
-      if (dayNum >= 25 && dayNum <= 31) {
-        const dayEvents = state.events.filter(e => e.dayOfWeek === dayOfWeek);
+      // Buscar eventos del día formateado en YYYY-MM-DD
+      const mmStr = String(month + 1).padStart(2, '0');
+      const ddStr = String(dayNum).padStart(2, '0');
+      const dateStr = `${year}-${mmStr}-${ddStr}`;
 
-        if (dayEvents.length > 0) {
-          cell.classList.add('has-events');
+      const dayEvents = state.events.filter(e => e.date === dateStr);
 
-          const dotsContainer = document.createElement('div');
-          dotsContainer.className = 'month-cell-events';
+      if (dayEvents.length > 0) {
+        cell.classList.add('has-events');
 
-          dayEvents.forEach(event => {
-            const dot = document.createElement('span');
-            const mainTag = event.tags[0].toLowerCase();
-            dot.className = `month-event-dot dot-${mainTag}`;
-            dotsContainer.appendChild(dot);
-          });
+        const dotsContainer = document.createElement('div');
+        dotsContainer.className = 'month-cell-events';
 
-          cell.appendChild(dotsContainer);
-        }
+        dayEvents.forEach(event => {
+          const dot = document.createElement('span');
+          const mainTag = event.tags[0].toLowerCase();
+          dot.className = `month-event-dot dot-${mainTag}`;
+          dotsContainer.appendChild(dot);
+        });
+
+        cell.appendChild(dotsContainer);
       }
 
-      // Al hacer clic, ir a la vista diaria de ese día
       cell.addEventListener('click', () => {
+        state.referenceDate = new Date(year, month, dayNum);
+        recalculateWeek();
         state.activeDay = dayOfWeek;
-        switchView('diario');
+        
+        loadEventsForCurrentWeek().then(() => {
+          switchView('diario');
+        });
       });
     }
 
@@ -841,7 +977,7 @@ function initLocationDropdown() {
       dom.locationSelector.classList.remove('open');
 
       // Cargar eventos de la nueva región
-      loadEventsByCity(city);
+      loadEventsForCurrentWeek();
     });
   });
 }
@@ -902,8 +1038,9 @@ async function initApp() {
     dom.locationDisplay.textContent = "Buenos Aires (AMBA)";
   }
 
-  // 6. Cargar eventos iniciales filtrados por ubicación detectada
-  await loadEventsByCity(state.currentCity);
+  // 6. Cargar eventos iniciales filtrados por ubicación detectada y configurar fechas
+  recalculateWeek();
+  await loadEventsForCurrentWeek();
 
   // 7. Inicializar la vista predeterminada (Diario)
   switchView(state.currentView);
