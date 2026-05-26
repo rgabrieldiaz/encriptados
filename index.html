@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Encriptados - Calendario Inmersivo de Eventos Tecnológicos Cripto, Inteligencia Artificial y Fintech en 3D.">
+  <title>Encriptados | Calendario Espacial de Eventos</title>
+  <!-- Google Fonts: Orbitron (futurista) y Outfit (moderna, legible) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- CSS Principal -->
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+
+  <!-- Fondo Dinámico: Canvas para la cuadrícula y las constelaciones en paralaje -->
+  <div class="bg-space-container">
+    <canvas id="space-canvas"></canvas>
+    <div class="bg-glow bg-glow-purple"></div>
+    <div class="bg-glow bg-glow-cyan"></div>
+  </div>
+
+  <!-- Contenedor Principal con Perspectiva 3D -->
+  <main class="viewport-3d">
+    <!-- Pantalla Curva Simulada -->
+    <div class="perspective-screen" id="perspective-screen">
+      
+      <!-- HEADER FLOTANTE (Z-depth alto) -->
+      <header class="floating-header" id="main-header">
+        <div class="header-inner">
+          <div class="logo-container">
+            <h1 class="logo">ENCRIPTADOS</h1>
+            <span class="tagline">FUTURE EVENT HORIZON</span>
+          </div>
+
+          <!-- Selector de Ubicación -->
+          <div class="location-selector" id="location-selector">
+            <div class="location-current">
+              <svg class="icon-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <div class="location-text">
+                <span class="location-label">UBICACIÓN DETECTADA</span>
+                <span class="location-value" id="current-location-display">Detectando ubicación...</span>
+              </div>
+              <svg class="icon-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </div>
+            
+            <!-- Menú Desplegable (Glassmorphic Dropdown) -->
+            <div class="location-dropdown" id="location-dropdown">
+              <div class="dropdown-header">Cambiar Región</div>
+              <ul>
+                <li data-city="AMBA" class="active">
+                  <span>Buenos Aires (AMBA)</span>
+                  <span class="flag">🇦🇷</span>
+                </li>
+                <li data-city="Bogotá">
+                  <span>Bogotá, Colombia</span>
+                  <span class="flag">🇨🇴</span>
+                </li>
+                <li data-city="Santiago">
+                  <span>Santiago, Chile</span>
+                  <span class="flag">🇨🇱</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- SECCIÓN DEL CALENDARIO CENTRAL (Z-depth medio) -->
+      <section class="calendar-container">
+        <!-- Encabezado de los días de la semana -->
+        <div class="calendar-days-header">
+          <div class="day-label-col">MON</div>
+          <div class="day-label-col">TUE</div>
+          <div class="day-label-col">WED</div>
+          <div class="day-label-col">THU</div>
+          <div class="day-label-col">FRI</div>
+          <div class="day-label-col">SAT</div>
+          <div class="day-label-col">SUN</div>
+        </div>
+
+        <!-- Grilla de Columnas para Eventos -->
+        <div class="calendar-grid" id="calendar-grid">
+          <!-- Columna Lunes (MON) -->
+          <div class="calendar-column" data-day="MON">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+          <!-- Columna Martes (TUE) -->
+          <div class="calendar-column" data-day="TUE">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+          <!-- Columna Miércoles (WED) -->
+          <div class="calendar-column" data-day="WED">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+          <!-- Columna Jueves (THU) -->
+          <div class="calendar-column" data-day="THU">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+          <!-- Columna Viernes (FRI) -->
+          <div class="calendar-column" data-day="FRI">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+          <!-- Columna Sábado (SAT) -->
+          <div class="calendar-column" data-day="SAT">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+          <!-- Columna Domingo (SUN) -->
+          <div class="calendar-column" data-day="SUN">
+            <div class="column-bg-glow"></div>
+            <div class="events-wrapper"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel de Footer Informativo -->
+      <footer class="footer-info">
+        <p>CONECTANDO ROBOTS DE LUMA CON EVENTOS WEB3, FINTECH E IA DESCENTRALIZADA.</p>
+      </footer>
+    </div>
+  </main>
+
+  <!-- MODAL DE DETALLE DE EVENTO (Glassmorphism Modal) -->
+  <div class="modal-overlay" id="event-modal">
+    <div class="modal-card">
+      <button class="modal-close-btn" id="modal-close-btn" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="modal-content">
+        <div class="modal-header-tags" id="modal-tags">
+          <!-- Tags dinámicos -->
+        </div>
+        <h2 class="modal-title" id="modal-title">Título del Evento</h2>
+        <div class="modal-meta-grid">
+          <div class="meta-item">
+            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span id="modal-date">Lunes, 25 de Mayo</span>
+          </div>
+          <div class="meta-item">
+            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span id="modal-time">19:00 - 22:00 hs</span>
+          </div>
+          <div class="meta-item">
+            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span id="modal-location">Palermo, CABA</span>
+          </div>
+        </div>
+        <p class="modal-description" id="modal-description">Descripción detallada del evento...</p>
+        <div class="modal-actions">
+          <button class="action-btn calendar-add-btn" id="modal-add-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+              <line x1="12" y1="14" x2="12" y2="20"></line>
+              <line x1="9" y1="17" x2="15" y2="17"></line>
+            </svg>
+            Añadir a mi Calendario
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENEDOR DE TOASTS/NOTIFICACIONES -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Script Principal de Entrada (ES Module) -->
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
