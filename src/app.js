@@ -384,32 +384,12 @@ function createEventCard(event) {
 
   const addBtn = document.createElement('button');
   addBtn.className = 'btn-card-add';
-  if (isAdded) {
-    addBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      Agregado
-    `;
-    addBtn.style.background = 'linear-gradient(90deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 255, 255, 0.05) 100%)';
-    addBtn.style.borderColor = 'var(--neon-cyan)';
-    addBtn.style.color = 'var(--neon-cyan)';
-  } else {
-    addBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-      A mi Calendario
-    `;
-  }
+  updateButtonVisualState(addBtn, isAdded);
 
-  // Interacción al agregar al calendario
+  // Interacción al agregar al calendario (abre el dropdown)
   addBtn.addEventListener('click', (e) => {
     e.stopPropagation(); // Evitar abrir el modal de detalles
-    toggleCalendarEvent(event, addBtn);
+    openDropdownMenu(e, event, addBtn);
   });
 
   actionDiv.appendChild(addBtn);
@@ -772,7 +752,7 @@ function renderMonthGrid() {
 // ==========================================================================
 
 /**
- * Agrega o elimina un evento del calendario del usuario, persistiendo en localStorage y notificando.
+ * Agrega o elimina un evento de favoritos (local storage) y sincroniza los botones.
  */
 function toggleCalendarEvent(event, buttonElement) {
   const index = state.userCalendar.indexOf(event.id);
@@ -780,44 +760,294 @@ function toggleCalendarEvent(event, buttonElement) {
 
   if (isAdding) {
     state.userCalendar.push(event.id);
-    showToast("EVENTO REGISTRADO", `${event.title} añadido a tu calendario.`, "success");
-    
-    // Cambiar estado visual del botón
+    showToast("EVENTO REGISTRADO", `${event.title} añadido a tus favoritos.`, "success");
+  } else {
+    state.userCalendar.splice(index, 1);
+    showToast("EVENTO ELIMINADO", `${event.title} removido de tus favoritos.`, "info");
+  }
+
+  // Guardar en almacenamiento local
+  localStorage.setItem('encriptados_calendar', JSON.stringify(state.userCalendar));
+
+  // Sincronizar el estado de todos los botones visibles de este evento (grilla y modal)
+  syncAllButtonsForEvent(event.id);
+}
+
+/**
+ * Sincroniza visualmente todos los botones que corresponden a un evento específico.
+ */
+function syncAllButtonsForEvent(eventId) {
+  const isAdded = state.userCalendar.includes(eventId);
+  
+  // Sincronizar tarjetas de la grilla
+  const cards = document.querySelectorAll(`.event-card[data-id="${eventId}"]`);
+  cards.forEach(card => {
+    const btn = card.querySelector('.btn-card-add');
+    if (btn) updateButtonVisualState(btn, isAdded);
+  });
+  
+  // Sincronizar botón del modal si está abierto
+  if (currentActiveModalEventId === eventId && dom.modalAddBtn) {
+    updateButtonVisualState(dom.modalAddBtn, isAdded);
+  }
+}
+
+/**
+ * Actualiza el estado y diseño visual de los botones de agregar al calendario.
+ */
+function updateButtonVisualState(buttonElement, isAdded) {
+  if (!buttonElement) return;
+  if (isAdded) {
     buttonElement.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-        <polyline points="20 6 9 17 4 12" />
+      <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" style="width: 13px; height: 13px; margin-right: 4px;">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
       </svg>
-      Agregado
+      <span>En mi Calendario</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 10px; height: 10px; margin-left: 4px;">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
     `;
     buttonElement.style.background = 'linear-gradient(90deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 255, 255, 0.05) 100%)';
     buttonElement.style.borderColor = 'var(--neon-cyan)';
     buttonElement.style.color = 'var(--neon-cyan)';
     buttonElement.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.15)';
   } else {
-    state.userCalendar.splice(index, 1);
-    showToast("EVENTO ELIMINADO", `${event.title} removido de tu calendario.`, "info");
-    
-    // Restaurar estado visual original del botón
     buttonElement.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-right: 4px;">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
         <line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
       </svg>
-      A mi Calendario
+      <span>Agregar a...</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 10px; height: 10px; margin-left: 4px;">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
     `;
     buttonElement.style.background = '';
     buttonElement.style.borderColor = '';
     buttonElement.style.color = '';
     buttonElement.style.boxShadow = '';
   }
+}
 
-  // Guardar en almacenamiento local
-  localStorage.setItem('encriptados_calendar', JSON.stringify(state.userCalendar));
+/**
+ * Despliega el menú flotante con las opciones de calendario para un evento.
+ */
+function openDropdownMenu(e, event, triggerElement) {
+  e.stopPropagation();
+  
+  // Cerrar cualquier dropdown abierto antes
+  closeAllDropdowns();
+  
+  const dropdown = document.createElement('div');
+  dropdown.className = 'calendar-dropdown';
+  
+  const isSaved = state.userCalendar.includes(event.id);
+  dropdown.innerHTML = `
+    <button class="dropdown-item local-save ${isSaved ? 'saved' : ''}" data-action="local">
+      <span class="item-icon">${isSaved ? '★' : '☆'}</span>
+      <span>${isSaved ? 'Quitar de Favoritos' : 'Guardar en el Sitio'}</span>
+    </button>
+    <div class="dropdown-divider"></div>
+    <a class="dropdown-item" href="${getGoogleCalendarUrl(event)}" target="_blank" data-action="google">
+      <span class="item-icon">🌐</span>
+      <span>Google Calendar</span>
+    </a>
+    <a class="dropdown-item" href="${getOutlookUrl(event, false)}" target="_blank" data-action="outlook">
+      <span class="item-icon">✉️</span>
+      <span>Outlook Web</span>
+    </a>
+    <a class="dropdown-item" href="${getOutlookUrl(event, true)}" target="_blank" data-action="office365">
+      <span class="item-icon">🏢</span>
+      <span>Microsoft 365</span>
+    </a>
+    <a class="dropdown-item" href="${getYahooUrl(event)}" target="_blank" data-action="yahoo">
+      <span class="item-icon">🟣</span>
+      <span>Yahoo Calendar</span>
+    </a>
+    <button class="dropdown-item" data-action="apple">
+      <span class="item-icon">🍎</span>
+      <span>Apple Calendar (.ics)</span>
+    </button>
+  `;
+  
+  // Obtener posición del disparador
+  const rect = triggerElement.getBoundingClientRect();
+  
+  dropdown.style.position = 'fixed';
+  dropdown.style.top = `${rect.bottom + 6}px`;
+  dropdown.style.left = `${rect.right - 180}px`;
+  dropdown.style.width = '180px';
+  dropdown.style.zIndex = '9999';
+  
+  // Manejador del archivo de Apple (.ics)
+  dropdown.querySelector('[data-action="apple"]').addEventListener('click', () => {
+    downloadIcsFile(event);
+    showToast("ARCHIVO DESCARGADO", "Archivo iCal (.ics) guardado con éxito.", "success");
+    closeAllDropdowns();
+  });
+  
+  // Manejador del favorito local
+  dropdown.querySelector('[data-action="local"]').addEventListener('click', () => {
+    toggleCalendarEvent(event, triggerElement);
+    closeAllDropdowns();
+  });
+  
+  // Mostrar Toast informando que se abre el enlace para servicios externos
+  dropdown.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      const name = link.querySelector('span:last-child').textContent;
+      showToast("REDIRECCIONANDO", `Abriendo ${name}...`, "info");
+      closeAllDropdowns();
+    });
+  });
+  
+  document.body.appendChild(dropdown);
+  
+  // Forzar reflow y mostrar con transición suave
+  requestAnimationFrame(() => {
+    dropdown.classList.add('show');
+  });
+  
+  // Event listeners globales para cerrar dropdowns
+  setTimeout(() => {
+    document.addEventListener('click', closeAllDropdownsOnOutsideClick);
+    window.addEventListener('scroll', closeAllDropdowns, { passive: true });
+    window.addEventListener('resize', closeAllDropdowns, { passive: true });
+  }, 0);
+}
 
-  // Si el modal está abierto, sincronizar el botón de acción del modal
-  updateModalButtonState(event.id);
+function closeAllDropdowns() {
+  const dropdowns = document.querySelectorAll('.calendar-dropdown');
+  dropdowns.forEach(d => {
+    d.classList.remove('show');
+    setTimeout(() => d.remove(), 150);
+  });
+  document.removeEventListener('click', closeAllDropdownsOnOutsideClick);
+  window.removeEventListener('scroll', closeAllDropdowns);
+  window.removeEventListener('resize', closeAllDropdowns);
+}
+
+function closeAllDropdownsOnOutsideClick(e) {
+  if (!e.target.closest('.calendar-dropdown') && !e.target.closest('.btn-card-add') && !e.target.closest('.calendar-add-btn')) {
+    closeAllDropdowns();
+  }
+}
+
+// ==========================================================================
+// FORMATEADORES Y PARSER PARA SERVICIOS DE CALENDARIO
+// ==========================================================================
+
+function parseEventTimes(dateStr, timeStr) {
+  const parts = timeStr.split("-").map(s => s.trim());
+  const startHourMin = parts[0].split(":");
+  const endHourMin = parts[1].split(":");
+  
+  const [year, month, day] = dateStr.split("-").map(Number);
+  
+  const start = new Date(year, month - 1, day, Number(startHourMin[0]), Number(startHourMin[1]), 0);
+  const end = new Date(year, month - 1, day, Number(endHourMin[0]), Number(endHourMin[1]), 0);
+  
+  return { start, end };
+}
+
+function formatIsoDate(d) {
+  return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+function getGoogleCalendarUrl(event) {
+  const { start, end } = parseEventTimes(event.date, event.time);
+  const fmtStart = formatIsoDate(start);
+  const fmtEnd = formatIsoDate(end);
+  
+  const baseUrl = "https://calendar.google.com/calendar/render";
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title,
+    dates: `${fmtStart}/${fmtEnd}`,
+    details: event.description || "",
+    location: event.location_detail || ""
+  });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+function getOutlookUrl(event, isOffice365 = false) {
+  const { start, end } = parseEventTimes(event.date, event.time);
+  const baseUrl = isOffice365 
+    ? "https://outlook.office.com/calendar/0/deeplink/compose"
+    : "https://outlook.live.com/calendar/0/deeplink/compose";
+  
+  const params = new URLSearchParams({
+    path: "/calendar/action/compose",
+    rru: "addevent",
+    subject: event.title,
+    startdt: start.toISOString(),
+    enddt: end.toISOString(),
+    body: event.description || "",
+    location: event.location_detail || ""
+  });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+function getYahooUrl(event) {
+  const { start, end } = parseEventTimes(event.date, event.time);
+  const fmtStart = formatIsoDate(start);
+  const fmtEnd = formatIsoDate(end);
+  
+  const baseUrl = "https://calendar.yahoo.com/";
+  const params = new URLSearchParams({
+    v: "60",
+    view: "d",
+    type: "20",
+    title: event.title,
+    st: fmtStart,
+    et: fmtEnd,
+    desc: event.description || "",
+    in_loc: event.location_detail || ""
+  });
+  return `${baseUrl}?${params.toString()}`;
+}
+
+function downloadIcsFile(event) {
+  const { start, end } = parseEventTimes(event.date, event.time);
+  const fmtStart = formatIsoDate(start);
+  const fmtEnd = formatIsoDate(end);
+  const fmtCreated = formatIsoDate(new Date());
+  
+  const cleanTitle = event.title.replace(/[,;]/g, '\\$&');
+  const cleanDesc = (event.description || "").replace(/[,;]/g, '\\$&').replace(/\n/g, '\\n');
+  const cleanLoc = (event.location_detail || "").replace(/[,;]/g, '\\$&');
+  
+  const icsLines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Encriptados//Calendar App//ES",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:event-${event.id}@encriptados.net`,
+    `DTSTAMP:${fmtCreated}`,
+    `DTSTART:${fmtStart}`,
+    `DTEND:${fmtEnd}`,
+    `SUMMARY:${cleanTitle}`,
+    `DESCRIPTION:${cleanDesc}`,
+    `LOCATION:${cleanLoc}`,
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ];
+  
+  const icsContent = icsLines.join("\r\n");
+  const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `evento-${event.id}.ics`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -886,49 +1116,18 @@ function openEventModal(event) {
   dom.modalDescription.textContent = event.description;
 
   // Actualizar botón de acción del modal
-  updateModalButtonState(event.id);
+  const isAdded = state.userCalendar.includes(event.id);
+  updateButtonVisualState(dom.modalAddBtn, isAdded);
 
-  // Quitar listener anterior y añadir el nuevo para manejar clicks del botón del modal
-  dom.modalAddBtn.onclick = () => {
-    const addBtnOnCard = document.querySelector(`.event-card[data-id="${event.id}"] .btn-card-add`);
-    toggleCalendarEvent(event, addBtnOnCard);
+  // Quitar listener anterior y añadir el nuevo para abrir el dropdown al hacer click
+  dom.modalAddBtn.onclick = (e) => {
+    e.stopPropagation();
+    openDropdownMenu(e, event, dom.modalAddBtn);
   };
 
   // Abrir modal con animación
   dom.eventModal.classList.add('open');
   document.body.style.overflow = 'hidden'; // Evitar scroll
-}
-
-function updateModalButtonState(eventId) {
-  if (currentActiveModalEventId !== eventId || !dom.modalAddBtn) return;
-
-  const isAdded = state.userCalendar.includes(eventId);
-  if (isAdded) {
-    dom.modalAddBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      Agregado a mi Calendario
-    `;
-    dom.modalAddBtn.style.background = 'linear-gradient(135deg, rgba(0,255,255,0.2) 0%, rgba(138,43,226,0.2) 100%)';
-    dom.modalAddBtn.style.boxShadow = 'inset 0 0 10px rgba(0, 255, 255, 0.2)';
-    dom.modalAddBtn.style.border = '1px solid var(--neon-cyan)';
-  } else {
-    dom.modalAddBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-        <line x1="12" y1="14" x2="12" y2="20" />
-        <line x1="9" y1="17" x2="15" y2="17" />
-      </svg>
-      Añadir a mi Calendario
-    `;
-    dom.modalAddBtn.style.background = '';
-    dom.modalAddBtn.style.boxShadow = '';
-    dom.modalAddBtn.style.border = '';
-  }
 }
 
 function closeEventModal() {

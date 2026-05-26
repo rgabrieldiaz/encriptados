@@ -1317,3 +1317,79 @@ body {
     margin-top: 20px;
   }
 }
+
+/* ==========================================================================
+   MENÚ DESPLEGABLE (DROPDOWN) DE CALENDARIOS
+   ========================================================================== */
+.calendar-dropdown {
+  background: rgba(10, 10, 20, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: 
+    0 15px 35px rgba(0, 0, 0, 0.7),
+    0 0 20px rgba(0, 255, 255, 0.08);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  pointer-events: none;
+}
+
+.calendar-dropdown.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.dropdown-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: var(--font-geom);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dropdown-item:hover {
+  background: rgba(0, 255, 255, 0.08);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.3);
+}
+
+.dropdown-item.local-save {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dropdown-item.local-save.saved {
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 6px;
+}
+
+.item-icon {
+  font-size: 13px;
+  display: inline-block;
+  width: 16px;
+  text-align: center;
+}
