@@ -588,6 +588,14 @@ body {
   text-shadow: 0 0 6px rgba(138, 43, 226, 0.5);
 }
 
+.month-cell.today {
+  border-color: rgba(138, 43, 226, 0.35) !important;
+  box-shadow: 
+    0 0 10px rgba(138, 43, 226, 0.12),
+    inset 0 0 8px rgba(138, 43, 226, 0.06) !important;
+  background: rgba(138, 43, 226, 0.03) !important;
+}
+
 /* Contenedor de puntos/eventos en la celda */
 .month-cell-events {
   display: flex;
@@ -674,6 +682,16 @@ body {
 .calendar-column:hover {
   background: rgba(255, 255, 255, 0.015);
   border-color: rgba(0, 255, 255, 0.08);
+}
+
+.calendar-column.today-column {
+  border-color: rgba(138, 43, 226, 0.25) !important;
+  background: rgba(138, 43, 226, 0.01) !important;
+}
+
+.calendar-column.today-column .column-bg-glow {
+  opacity: 1 !important;
+  background: radial-gradient(circle at 50% 10%, rgba(138, 43, 226, 0.06) 0%, transparent 75%) !important;
 }
 
 .column-bg-glow {

@@ -312,10 +312,21 @@ function renderEvents() {
     col.classList.remove('has-events');
   });
 
-  // Mapeamos los días de las columnas para mobile
+  // Mapeamos los días de las columnas para mobile y marcamos hoy
+  const today = new Date();
   dom.columns.forEach(col => {
     const day = col.getAttribute('data-day');
-    col.setAttribute('data-day-full', dayNameMap[day] || day);
+    const d = weekDates[day];
+    const isToday = d && d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    
+    const baseName = dayNameMap[day] || day;
+    col.setAttribute('data-day-full', isToday ? `${baseName} (HOY)` : baseName);
+
+    if (isToday) {
+      col.classList.add('today-column');
+    } else {
+      col.classList.remove('today-column');
+    }
   });
 
   // 2. Insertar las tarjetas en la columna correcta
@@ -604,14 +615,32 @@ async function loadEventsForCurrentWeek() {
 function renderWeekDaysHeader() {
   if (!dom.calendarDaysHeader) return;
   const headers = dom.calendarDaysHeader.querySelectorAll('.day-label-col');
+  const dayHeaderMap = {
+    MON: "LUN",
+    TUE: "MAR",
+    WED: "MIÉ",
+    THU: "JUE",
+    FRI: "VIE",
+    SAT: "SÁB",
+    SUN: "DOM"
+  };
+
   daysOrder.forEach((day, index) => {
     if (headers[index]) {
+      const label = dayHeaderMap[day] || day;
       if (state.currentView === 'mensual') {
-        headers[index].innerHTML = day;
+        headers[index].innerHTML = label;
       } else {
         const d = weekDates[day];
         const dayNum = d.getDate();
-        headers[index].innerHTML = `${day} <span class="header-day-num" style="color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 255, 255, 0.3); font-size: 14px; display: block; margin-top: 4px;">${dayNum}</span>`;
+        const today = new Date();
+        const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        
+        if (isToday) {
+          headers[index].innerHTML = `${label} <span class="header-day-num" style="color: var(--neon-purple); text-shadow: 0 0 5px rgba(138, 43, 226, 0.6); font-size: 14px; display: block; margin-top: 4px;">${dayNum} <span style="font-size: 9px; font-weight: 800; vertical-align: middle; background: rgba(138, 43, 226, 0.2); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(138, 43, 226, 0.4); margin-left: 2px;">HOY</span></span>`;
+        } else {
+          headers[index].innerHTML = `${label} <span class="header-day-num" style="color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 255, 255, 0.3); font-size: 14px; display: block; margin-top: 4px;">${dayNum}</span>`;
+        }
       }
     }
   });
