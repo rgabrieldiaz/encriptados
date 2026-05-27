@@ -592,7 +592,7 @@ function switchView(viewName) {
     });
   } else if (viewName === 'mensual') {
     dom.dayNavigation.classList.remove('hidden'); // Mostrar navegación
-    dom.calendarDaysHeader.style.display = 'grid'; // Mostrar cabecera Lun, Mar... encima de la grilla mensual
+    dom.calendarDaysHeader.style.display = 'none'; // Ocultar cabecera en mensual para evitar confusión
     dom.calendarGrid.style.display = 'none';
     dom.monthGrid.classList.add('active');
 
