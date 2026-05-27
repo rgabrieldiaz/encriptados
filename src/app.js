@@ -511,7 +511,7 @@ function setupCard3DInteractions() {
     card.addEventListener('mouseleave', () => {
       card.style.transform = 'translateZ(35px) rotateX(0deg) rotateY(0deg) scale(1)';
       card.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.5)';
-      card.style.borderColor = 'rgba(255, 255, 255, 0.07)';
+      card.style.borderColor = '';
     });
   });
 }
