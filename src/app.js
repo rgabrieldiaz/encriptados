@@ -393,6 +393,15 @@ function createEventCard(event) {
   `;
   card.appendChild(bookmarkBtn);
 
+  // 1b. Miniatura del evento (Thumbnail cuadrado)
+  const thumbContainer = document.createElement('div');
+  thumbContainer.className = 'event-card-thumb';
+  const thumbImg = document.createElement('img');
+  thumbImg.src = 'src/assets/event-placeholder.png';
+  thumbImg.alt = event.title;
+  thumbContainer.appendChild(thumbImg);
+  card.appendChild(thumbContainer);
+
   // 2. Título (arriba del evento)
   const title = document.createElement('h3');
   title.className = 'event-card-title';

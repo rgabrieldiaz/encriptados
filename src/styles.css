@@ -1953,3 +1953,33 @@ dialog[open] {
     0 0 10px rgba(0, 255, 255, 0.1) !important;
 }
 
+/* Miniatura del evento (Thumbnail cuadrado) */
+.event-card-thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+  transform: translateZ(10px);
+}
+
+.event-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+
+.event-card:hover .event-card-thumb img {
+  transform: scale(1.05);
+}
+
+/* Ocultar miniatura en vista mensual */
+.month-cell .event-card .event-card-thumb {
+  display: none !important;
+}
+
+
