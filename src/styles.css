@@ -1794,3 +1794,162 @@ dialog[open] {
 .hidden {
   display: none !important;
 }
+
+/* ==========================================================================
+   PILL CONTROLS & MONTHLY CARDS
+   ========================================================================== */
+
+.view-controls-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time-period-pill {
+  background: rgba(14, 14, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-geom);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px; /* Matches view-switcher height */
+  white-space: nowrap;
+}
+
+.time-period-pill:hover {
+  background: rgba(255, 255, 255, 0.02);
+  color: #ffffff;
+  border-color: rgba(0, 255, 255, 0.3);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+}
+
+.time-period-pill.active {
+  background: rgba(138, 43, 226, 0.15);
+  border-color: var(--neon-purple);
+  color: #ffffff;
+  text-shadow: 0 0 5px rgba(138, 43, 226, 0.6);
+  box-shadow: 0 0 15px rgba(138, 43, 226, 0.25);
+}
+
+.time-period-pill.active:hover {
+  background: rgba(138, 43, 226, 0.25);
+  box-shadow: 0 0 20px rgba(138, 43, 226, 0.4);
+}
+
+/* Contenedor de eventos en las celdas del mes */
+.month-cell-events-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  overflow-y: auto;
+  max-height: 90px;
+  padding-right: 4px;
+}
+
+/* Custom scrollbar para el contenedor de eventos mensuales */
+.month-cell-events-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.month-cell-events-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.month-cell-events-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.month-cell-events-container::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan);
+}
+
+/* Redefinir la tarjeta dentro del mes (solo título, guardar y calendario) */
+.month-cell .event-card {
+  padding: 8px;
+  gap: 6px;
+  min-height: auto;
+  background: rgba(14, 14, 25, 0.85);
+  border-radius: 8px;
+  border-width: 1px;
+  transform: none !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+.month-cell .event-card .event-card-title {
+  font-size: 11px;
+  line-height: 1.3;
+  margin-top: 0;
+  margin-right: 18px; /* Espacio para el bookmark */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.month-cell .event-card .btn-bookmark {
+  top: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  position: absolute;
+}
+
+.month-cell .event-card .btn-bookmark svg {
+  width: 12px;
+  height: 12px;
+}
+
+.month-cell .event-card .event-card-time,
+.month-cell .event-card .event-card-meta-row,
+.month-cell .event-card .btn-card-add span {
+  display: none !important;
+}
+
+.month-cell .event-card .event-card-action {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.month-cell .event-card .btn-card-add {
+  padding: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: #141416;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.month-cell .event-card .btn-card-add svg {
+  width: 12px;
+  height: 12px;
+  margin: 0 !important;
+}
+
+.month-cell .event-card:hover {
+  transform: translateY(-2px) translateZ(10px) scale(1.01) !important;
+  box-shadow: 
+    0 8px 15px rgba(0, 0, 0, 0.6), 
+    0 0 10px rgba(0, 255, 255, 0.1) !important;
+}
+

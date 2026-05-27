@@ -91,6 +91,7 @@ const dom = {
   
   // Nuevos selectores para la barra de controles
   viewSwitcher: document.getElementById('view-switcher'),
+  timePeriodPill: document.getElementById('time-period-pill'),
   viewTabs: document.querySelectorAll('.view-tab'),
   switcherSlider: document.getElementById('switcher-slider'),
   dayNavigation: document.getElementById('day-navigation'),
@@ -603,6 +604,9 @@ function switchView(viewName) {
 
   // Recalcular interacciones 3D para adaptarlas
   setupCard3DInteractions();
+
+  // Actualizar estado del pill temporal
+  updatePeriodPillState();
 }
 
 function updateActiveDayColumn() {
@@ -650,6 +654,7 @@ async function navigateCalendar(direction) {
     } else {
       state.activeDay = daysOrder[newIndex];
       updateActiveDayColumn();
+      updatePeriodPillState();
     }
   } else if (state.currentView === 'semanal') {
     // Avanzar/Retroceder 1 semana
@@ -674,6 +679,7 @@ async function loadEventsForCurrentWeek() {
     renderMonthGrid();
   }
   updateNavigationTitle();
+  updatePeriodPillState();
 }
 
 function renderWeekDaysHeader() {
@@ -701,9 +707,9 @@ function renderWeekDaysHeader() {
         const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
         
         if (isToday) {
-          headers[index].innerHTML = `${label} <span class="header-day-num" style="color: var(--neon-purple); text-shadow: 0 0 5px rgba(138, 43, 226, 0.6); font-size: 14px; display: block; margin-top: 4px;">${dayNum} <span style="font-size: 9px; font-weight: 800; vertical-align: middle; background: rgba(138, 43, 226, 0.2); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(138, 43, 226, 0.4); margin-left: 2px;">HOY</span></span>`;
+          headers[index].innerHTML = `<span class="header-day-num" style="color: var(--neon-purple); text-shadow: 0 0 5px rgba(138, 43, 226, 0.6); font-size: 14px; display: block; margin-top: 4px;">${dayNum} <span style="font-size: 9px; font-weight: 800; vertical-align: middle; background: rgba(138, 43, 226, 0.2); padding: 1px 4px; border-radius: 4px; border: 1px solid rgba(138, 43, 226, 0.4); margin-left: 2px;">HOY</span></span>`;
         } else {
-          headers[index].innerHTML = `${label} <span class="header-day-num" style="color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 255, 255, 0.3); font-size: 14px; display: block; margin-top: 4px;">${dayNum}</span>`;
+          headers[index].innerHTML = `<span class="header-day-num" style="color: var(--neon-cyan); text-shadow: 0 0 5px rgba(0, 255, 255, 0.3); font-size: 14px; display: block; margin-top: 4px;">${dayNum}</span>`;
         }
       }
     }
@@ -749,6 +755,42 @@ function updateNavigationTitle() {
     const year = state.referenceDate.getFullYear();
     const monthName = monthsSpanish[state.referenceDate.getMonth()];
     dom.activeDayTitle.textContent = `${monthName} ${year}`;
+  }
+}
+
+function updatePeriodPillState() {
+  if (!dom.timePeriodPill) return;
+
+  const today = new Date();
+  let text = '';
+  let isActive = false;
+
+  if (state.currentView === 'diario') {
+    text = 'Hoy';
+    const ref = state.referenceDate;
+    const isSameDate = ref.getDate() === today.getDate() &&
+                       ref.getMonth() === today.getMonth() &&
+                       ref.getFullYear() === today.getFullYear();
+    const todayDayOfWeek = daysOrder[today.getDay() === 0 ? 6 : today.getDay() - 1];
+    isActive = isSameDate && (state.activeDay === todayDayOfWeek);
+  } else if (state.currentView === 'semanal') {
+    text = 'Esta semana';
+    const refMonday = getMondayOfDate(state.referenceDate);
+    const todayMonday = getMondayOfDate(today);
+    isActive = refMonday.getDate() === todayMonday.getDate() &&
+               refMonday.getMonth() === todayMonday.getMonth() &&
+               refMonday.getFullYear() === todayMonday.getFullYear();
+  } else if (state.currentView === 'mensual') {
+    text = 'Este mes';
+    isActive = state.referenceDate.getMonth() === today.getMonth() &&
+               state.referenceDate.getFullYear() === today.getFullYear();
+  }
+
+  dom.timePeriodPill.textContent = text;
+  if (isActive) {
+    dom.timePeriodPill.classList.add('active');
+  } else {
+    dom.timePeriodPill.classList.remove('active');
   }
 }
 
@@ -812,17 +854,19 @@ function renderMonthGrid() {
       if (dayEvents.length > 0) {
         cell.classList.add('has-events');
 
-        const dotsContainer = document.createElement('div');
-        dotsContainer.className = 'month-cell-events';
+        const eventsContainer = document.createElement('div');
+        eventsContainer.className = 'month-cell-events-container';
 
         dayEvents.forEach(event => {
-          const dot = document.createElement('span');
-          const mainTag = event.tags[0].toLowerCase();
-          dot.className = `month-event-dot dot-${mainTag}`;
-          dotsContainer.appendChild(dot);
+          const card = createEventCard(event);
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEventModal(event);
+          });
+          eventsContainer.appendChild(card);
         });
 
-        cell.appendChild(dotsContainer);
+        cell.appendChild(eventsContainer);
       }
 
       cell.addEventListener('click', () => {
@@ -914,7 +958,7 @@ function updateButtonVisualState(buttonElement, isAdded) {
   if (!buttonElement) return;
   if (isAdded) {
     buttonElement.innerHTML = `
-      <span>En mi Calendario</span>
+      <span>En mi calendario</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
         <polyline points="20 6 9 17 4 12" />
       </svg>
@@ -922,7 +966,7 @@ function updateButtonVisualState(buttonElement, isAdded) {
     buttonElement.classList.add('added');
   } else {
     buttonElement.innerHTML = `
-      <span>Añadir a mi Calendario</span>
+      <span>Añadir al calendario</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
@@ -1489,6 +1533,18 @@ async function initApp() {
   // Iniciar Selector de Vistas y Navegación Diaria
   initViewSwitcher();
   initDayNavigation();
+
+  // Inicializar botón/pill de período temporal
+  if (dom.timePeriodPill) {
+    dom.timePeriodPill.addEventListener('click', async () => {
+      const today = new Date();
+      state.referenceDate = new Date(today);
+      const todayDayOfWeek = daysOrder[today.getDay() === 0 ? 6 : today.getDay() - 1];
+      state.activeDay = todayDayOfWeek;
+      recalculateWeek();
+      await loadEventsForCurrentWeek();
+    });
+  }
 
   // 4. Configurar eventos de cierre del modal
   dom.modalCloseBtn.addEventListener('click', closeEventModal);
