@@ -6,17 +6,33 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Inicializar clientes
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-);
+// Inicializar clientes de forma perezosa
+let supabase = null;
+let geminiModel = null;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash',
-  generationConfig: { responseMimeType: 'application/json' }
-});
+function ensureClientsInitialized() {
+  if (supabase && geminiModel) return;
+
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.GEMINI_API_KEY) {
+    console.error('\n❌ ERROR: Faltan variables de entorno requeridas en el archivo .env o en el sistema:\n');
+    if (!process.env.SUPABASE_URL) console.error('- SUPABASE_URL');
+    if (!process.env.SUPABASE_ANON_KEY) console.error('- SUPABASE_ANON_KEY');
+    if (!process.env.GEMINI_API_KEY) console.error('- GEMINI_API_KEY');
+    console.error('\nPor favor, configura tu archivo .env o las variables de entorno de tu sistema.\n');
+    process.exit(1);
+  }
+
+  supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
+  );
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  geminiModel = genAI.getGenerativeModel({
+    model: 'gemini-1.5-flash',
+    generationConfig: { responseMimeType: 'application/json' }
+  });
+}
 
 // Comunidades Lu.ma a rastrear
 const communities = [
@@ -32,11 +48,7 @@ const daysOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
 async function runScraper() {
   console.log('=== INICIANDO ROBOT EXTRACTOR DE ENCRIPTADOS ===');
-  
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY || !process.env.GEMINI_API_KEY) {
-    console.error('Faltan variables de entorno requeridas (SUPABASE_URL, SUPABASE_ANON_KEY, GEMINI_API_KEY).');
-    process.exit(1);
-  }
+  ensureClientsInitialized();
 
   // 1. Obtener URLs de eventos ya almacenados para evitar duplicar scrape
   console.log('Obteniendo enlaces existentes de la base de datos...');
@@ -139,6 +151,7 @@ async function runScraper() {
  * Raspa y procesa un único evento de Lu.ma en base a su HTML y script NEXT_DATA.
  */
 export async function scrapeSingleLumaEvent(url, defaultCity = 'AMBA') {
+  ensureClientsInitialized();
   try {
     const res = await fetch(url, {
       headers: {
@@ -230,15 +243,15 @@ Tu trabajo es procesar información desestructurada de un evento extraído de Lu
 
 Reglas críticas:
 1. "location_city" debe ser "AMBA" si la ubicación es en Buenos Aires (CABA, Buenos Aires, AMBA, Argentina). Usa "Bogotá" para Bogotá (Colombia) y "Santiago" para Santiago (Chile). Si no coincide con ninguna y no es virtual, marca "is_valid": false.
-2. Estandariza la fecha "event_date" basada en la fecha provista "${rawDate}". Si está en formato ISO (ej: 2026-05-27T21:30:00.000Z), conviértela a la zona horaria local de Sudamérica (UTC-3).
+2. Estandariza la fecha "event_date" basada en la fecha provista "\${rawDate}". Si está en formato ISO (ej: 2026-05-27T21:30:00.000Z), conviértela a la zona horaria local de Sudamérica (UTC-3).
 3. Devuelve únicamente el objeto JSON bien formado sin rodeos de texto ni markdown.`;
 
-  const userPrompt = `URL: ${url}
-Ciudad de origen asumida: ${defaultCity}
-Título extraído: ${title}
-Descripción extraída: ${description.slice(0, 1500)}
-Ubicación cruda: ${rawLocation}
-Fecha cruda: ${rawDate}`;
+  const userPrompt = `URL: \${url}
+Ciudad de origen asumida: \${defaultCity}
+Título extraído: \${title}
+Descripción extraída: \${description.slice(0, 1500)}
+Ubicación cruda: \${rawLocation}
+Fecha cruda: \${rawDate}`;
 
   try {
     const chat = geminiModel.startChat({
@@ -255,7 +268,7 @@ Fecha cruda: ${rawDate}`;
     const result = JSON.parse(text);
     
     if (result.is_valid === false) {
-      console.warn(`Evento descartado por geofiltro (no válido para la ciudad asumida): "${title}" en "${rawLocation}"`);
+      console.warn(`Evento descartado por geofiltro (no válido para la ciudad asumida): "\${title}" en "\${rawLocation}"`);
       return null;
     }
 
@@ -279,6 +292,6 @@ Fecha cruda: ${rawDate}`;
 }
 
 // Ejecutar si se corre directamente
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === \`file://\${process.argv[1]}\`) {
   runScraper();
 }
