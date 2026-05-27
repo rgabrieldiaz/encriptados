@@ -746,9 +746,9 @@ body {
   background: rgba(14, 14, 25, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12); /* Gris por defecto */
   border-radius: 12px;
-  padding: 14px;
+  padding: 16px 14px 14px 14px;
   cursor: pointer;
   transform: translateZ(35px);
   transform-style: preserve-3d;
@@ -762,39 +762,112 @@ body {
     border-color var(--transition-normal);
 }
 
-/* Efecto hover y oscilación en 3D */
+/* Efecto hover y oscilación en 3D (cuando no está guardado) */
 .event-card:hover {
   transform: translateY(-8px) translateZ(50px) scale(1.02);
   box-shadow: 
     0 25px 45px rgba(0, 0, 0, 0.75), 
     0 0 20px rgba(0, 255, 255, 0.18);
-  border-color: rgba(0, 255, 255, 0.35);
+  border-color: var(--neon-cyan); /* Cyan on hover */
 }
 
-.event-card-type-indicator {
+/* Borde Violeta cuando el evento está guardado/marcado */
+.event-card.is-saved {
+  border-color: var(--neon-purple); /* Violeta */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(138, 43, 226, 0.25);
+}
+
+.event-card.is-saved:hover {
+  border-color: var(--neon-purple); /* Se mantiene violeta en hover */
+  box-shadow: 
+    0 25px 45px rgba(0, 0, 0, 0.75), 
+    0 0 25px rgba(138, 43, 226, 0.4);
+}
+
+/* Botón de Bookmark (Guardar/Destacar) */
+.btn-bookmark {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 6px;
-  height: 6px;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+  z-index: 10;
+  transform: translateZ(25px);
+}
+
+.btn-bookmark:hover {
+  color: var(--neon-cyan);
+  transform: scale(1.15) translateZ(25px);
+}
+
+.btn-bookmark.active {
+  color: var(--neon-purple);
+}
+
+.btn-bookmark svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 2px;
+  transition: fill var(--transition-fast);
+}
+
+/* Fila de metadatos (Tags + Indicador circular) */
+.event-card-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  transform: translateZ(10px);
+}
+
+.event-badge-indicator {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.5);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
-.event-card-type-indicator.presencial {
-  background-color: var(--neon-cyan);
-  box-shadow: 0 0 6px var(--neon-cyan);
+.event-badge-indicator.presencial {
+  color: var(--neon-cyan);
+  border-color: rgba(0, 255, 255, 0.25);
+  background: rgba(0, 255, 255, 0.05);
+  box-shadow: inset 0 0 5px rgba(0, 255, 255, 0.1);
 }
 
-.event-card-type-indicator.virtual {
-  background-color: var(--neon-purple);
-  box-shadow: 0 0 6px var(--neon-purple);
+.event-badge-indicator.virtual {
+  color: var(--neon-purple);
+  border-color: rgba(138, 43, 226, 0.25);
+  background: rgba(138, 43, 226, 0.05);
+  box-shadow: inset 0 0 5px rgba(138, 43, 226, 0.1);
+}
+
+.event-badge-indicator svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2px;
 }
 
 .event-card-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  transform: translateZ(10px); /* Flota dentro de la tarjeta */
 }
 
 .event-tag {
@@ -835,7 +908,7 @@ body {
   font-weight: 700;
   line-height: 1.35;
   color: #ffffff;
-  margin-top: 4px;
+  margin-top: 2px;
   transform: translateZ(15px); /* Más arriba que los tags */
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -850,7 +923,7 @@ body {
   transform: translateZ(5px);
 }
 
-/* Botón de Acción Añadir (Z-depth: 25px dentro de la tarjeta, total 75px) */
+/* Botón de Acción Añadir */
 .event-card-action {
   margin-top: auto;
   transform: translateZ(20px);
@@ -868,32 +941,42 @@ body {
 
 .btn-card-add {
   width: 100%;
-  background: linear-gradient(90deg, rgba(138, 43, 226, 0.2) 0%, rgba(0, 255, 255, 0.2) 100%);
-  border: 1px solid rgba(0, 255, 255, 0.3);
+  background: #141416; /* Color oscuro como en la captura */
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #ffffff;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
   font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   transition: all var(--transition-fast);
 }
 
 .btn-card-add:hover {
-  background: linear-gradient(90deg, var(--neon-purple) 0%, var(--neon-cyan) 100%);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
-  border-color: #ffffff;
-  transform: scale(1.03);
+  background: #1c1c1f;
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-card-add.added {
+  background: rgba(138, 43, 226, 0.12);
+  border-color: var(--neon-purple);
+  color: #dfb5ff;
+}
+
+.btn-card-add.added:hover {
+  background: rgba(138, 43, 226, 0.2);
 }
 
 .btn-card-add svg {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
   stroke: currentColor;
 }
 
@@ -1259,15 +1342,24 @@ body {
   /* Tarjeta de evento plana de alta calidad en móviles */
   .event-card {
     transform: none !important;
-    padding: 12px 14px;
+    padding: 14px;
     background: rgba(18, 18, 30, 0.85);
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .event-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
-    border-color: rgba(0, 255, 255, 0.2);
+    border-color: var(--neon-cyan);
+  }
+
+  .event-card.is-saved {
+    border-color: var(--neon-purple);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 12px rgba(138, 43, 226, 0.2);
+  }
+
+  .event-card.is-saved:hover {
+    border-color: var(--neon-purple);
   }
 
   .event-card-title {

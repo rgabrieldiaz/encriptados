@@ -114,7 +114,6 @@ const dom = {
   previewTags: document.getElementById('preview-tags'),
   previewCardTitle: document.getElementById('preview-card-title'),
   previewCardTime: document.getElementById('preview-card-time'),
-  previewLocationDetail: document.getElementById('preview-location-detail'),
   btnConfirmSave: document.getElementById('btn-confirm-save')
 };
 
@@ -377,12 +376,44 @@ function createEventCard(event) {
   card.className = 'event-card';
   card.dataset.id = event.id;
 
-  // Indicador de tipo (presencial o virtual)
-  const indicator = document.createElement('div');
-  indicator.className = `event-card-type-indicator ${event.location_type}`;
-  card.appendChild(indicator);
+  const isAdded = state.userCalendar.includes(event.id);
+  if (isAdded) {
+    card.classList.add('is-saved');
+  }
 
-  // Tags
+  // 1. Botón de Bookmark (Arriba a la derecha)
+  const bookmarkBtn = document.createElement('button');
+  bookmarkBtn.className = `btn-bookmark ${isAdded ? 'active' : ''}`;
+  bookmarkBtn.setAttribute('aria-label', 'Guardar evento');
+  bookmarkBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="${isAdded ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+    </svg>
+  `;
+  card.appendChild(bookmarkBtn);
+
+  // 2. Título (arriba del evento)
+  const title = document.createElement('h3');
+  title.className = 'event-card-title';
+  title.textContent = event.title;
+  card.appendChild(title);
+
+  // 3. Horario (comienzo y fin)
+  const parts = event.date.split('-');
+  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+  const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+  const formattedMonth = months[dateObj.getMonth()];
+  const formattedDate = `${dateObj.getDate()} ${formattedMonth} ${dateObj.getFullYear()}`;
+  
+  const time = document.createElement('span');
+  time.className = 'event-card-time';
+  time.textContent = `${formattedDate} - ${event.time}`;
+  card.appendChild(time);
+
+  // 4. Fila de metadatos (Hashtags + Indicador de Tipo)
+  const metaContainer = document.createElement('div');
+  metaContainer.className = 'event-card-meta-row';
+
   const tagsContainer = document.createElement('div');
   tagsContainer.className = 'event-card-tags';
   event.tags.forEach(tag => {
@@ -391,22 +422,32 @@ function createEventCard(event) {
     span.textContent = `#${tag}`;
     tagsContainer.appendChild(span);
   });
-  card.appendChild(tagsContainer);
+  metaContainer.appendChild(tagsContainer);
 
-  // Título
-  const title = document.createElement('h3');
-  title.className = 'event-card-title';
-  title.textContent = event.title;
-  card.appendChild(title);
+  // Indicador de tipo circular
+  const indicator = document.createElement('div');
+  indicator.className = `event-badge-indicator ${event.location_type}`;
+  if (event.location_type === 'presencial') {
+    indicator.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+        <circle cx="12" cy="10" r="3" />
+      </svg>
+    `;
+    indicator.title = 'Presencial';
+  } else {
+    indicator.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 7l-7 5 7 5V7z" />
+        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+      </svg>
+    `;
+    indicator.title = 'Virtual';
+  }
+  metaContainer.appendChild(indicator);
+  card.appendChild(metaContainer);
 
-  // Horario
-  const time = document.createElement('span');
-  time.className = 'event-card-time';
-  time.textContent = event.time;
-  card.appendChild(time);
-
-  // Lógica del botón de calendario
-  const isAdded = state.userCalendar.includes(event.id);
+  // 5. Botón de agregar a calendario (abajo de todo)
   const actionDiv = document.createElement('div');
   actionDiv.className = 'event-card-action';
 
@@ -414,10 +455,16 @@ function createEventCard(event) {
   addBtn.className = 'btn-card-add';
   updateButtonVisualState(addBtn, isAdded);
 
-  // Interacción al agregar al calendario (abre el dropdown)
+  // Interacción al agregar al calendario
   addBtn.addEventListener('click', (e) => {
-    e.stopPropagation(); // Evitar abrir el modal de detalles
+    e.stopPropagation();
     openDropdownMenu(e, event, addBtn);
+  });
+
+  // Interacción al guardar/bookmarkear
+  bookmarkBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleCalendarEvent(event, addBtn);
   });
 
   actionDiv.appendChild(addBtn);
@@ -828,6 +875,28 @@ function syncAllButtonsForEvent(eventId) {
   // Sincronizar tarjetas de la grilla
   const cards = document.querySelectorAll(`.event-card[data-id="${eventId}"]`);
   cards.forEach(card => {
+    // Sincronizar clase de guardado para el borde
+    if (isAdded) {
+      card.classList.add('is-saved');
+    } else {
+      card.classList.remove('is-saved');
+    }
+
+    // Sincronizar botón de bookmark
+    const bookmarkBtn = card.querySelector('.btn-bookmark');
+    if (bookmarkBtn) {
+      if (isAdded) {
+        bookmarkBtn.classList.add('active');
+        const svg = bookmarkBtn.querySelector('svg');
+        if (svg) svg.setAttribute('fill', 'currentColor');
+      } else {
+        bookmarkBtn.classList.remove('active');
+        const svg = bookmarkBtn.querySelector('svg');
+        if (svg) svg.setAttribute('fill', 'none');
+      }
+    }
+
+    // Sincronizar botón de agregar
     const btn = card.querySelector('.btn-card-add');
     if (btn) updateButtonVisualState(btn, isAdded);
   });
@@ -845,36 +914,29 @@ function updateButtonVisualState(buttonElement, isAdded) {
   if (!buttonElement) return;
   if (isAdded) {
     buttonElement.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" style="width: 13px; height: 13px; margin-right: 4px;">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
       <span>En mi Calendario</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 10px; height: 10px; margin-left: 4px;">
-        <polyline points="6 9 12 15 18 9" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
+        <polyline points="20 6 9 17 4 12" />
       </svg>
     `;
-    buttonElement.style.background = 'linear-gradient(90deg, rgba(0, 255, 255, 0.15) 0%, rgba(0, 255, 255, 0.05) 100%)';
-    buttonElement.style.borderColor = 'var(--neon-cyan)';
-    buttonElement.style.color = 'var(--neon-cyan)';
-    buttonElement.style.boxShadow = '0 0 10px rgba(0, 255, 255, 0.15)';
+    buttonElement.classList.add('added');
   } else {
     buttonElement.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-right: 4px;">
+      <span>Añadir a mi Calendario</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
         <line x1="8" y1="2" x2="8" y2="6" />
         <line x1="3" y1="10" x2="21" y2="10" />
       </svg>
-      <span>Agregar a...</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 10px; height: 10px; margin-left: 4px;">
-        <polyline points="6 9 12 15 18 9" />
-      </svg>
     `;
-    buttonElement.style.background = '';
-    buttonElement.style.borderColor = '';
-    buttonElement.style.color = '';
-    buttonElement.style.boxShadow = '';
+    buttonElement.classList.remove('added');
   }
+  // Limpiar estilos en línea previos
+  buttonElement.style.background = '';
+  buttonElement.style.borderColor = '';
+  buttonElement.style.color = '';
+  buttonElement.style.boxShadow = '';
 }
 
 /**
@@ -1038,17 +1100,12 @@ function getOutlookUrl(event, isOffice365 = false) {
 
 function getYahooUrl(event) {
   const { start, end } = parseEventTimes(event.date, event.time);
-  const fmtStart = formatIsoDate(start);
-  const fmtEnd = formatIsoDate(end);
-  
   const baseUrl = "https://calendar.yahoo.com/";
   const params = new URLSearchParams({
     v: "60",
-    view: "d",
-    type: "20",
     title: event.title,
-    st: fmtStart,
-    et: fmtEnd,
+    st: formatIsoDate(start),
+    et: formatIsoDate(end),
     desc: event.description || "",
     in_loc: event.location_detail || ""
   });
@@ -1059,44 +1116,38 @@ function downloadIcsFile(event) {
   const { start, end } = parseEventTimes(event.date, event.time);
   const fmtStart = formatIsoDate(start);
   const fmtEnd = formatIsoDate(end);
-  const fmtCreated = formatIsoDate(new Date());
   
-  const cleanTitle = event.title.replace(/[,;]/g, '\\$&');
-  const cleanDesc = (event.description || "").replace(/[,;]/g, '\\$&').replace(/\n/g, '\\n');
-  const cleanLoc = (event.location_detail || "").replace(/[,;]/g, '\\$&');
-  
-  const icsLines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Encriptados//Calendar App//ES",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "BEGIN:VEVENT",
-    `UID:event-${event.id}@encriptados.net`,
-    `DTSTAMP:${fmtCreated}`,
-    `DTSTART:${fmtStart}`,
-    `DTEND:${fmtEnd}`,
-    `SUMMARY:${cleanTitle}`,
-    `DESCRIPTION:${cleanDesc}`,
-    `LOCATION:${cleanLoc}`,
-    "END:VEVENT",
-    "END:VCALENDAR"
-  ];
-  
-  const icsContent = icsLines.join("\r\n");
-  const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8;" });
+  const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Encriptados//Calendar Event//ES
+BEGIN:VEVENT
+UID:${event.id}-${Date.now()}@encriptados
+DTSTAMP:${formatIsoDate(new Date())}
+DTSTART:${fmtStart}
+DTEND:${fmtEnd}
+SUMMARY:${event.title}
+DESCRIPTION:${(event.description || "").replace(/\n/g, "\\n")}
+LOCATION:${event.location_detail || ""}
+END:VEVENT
+END:VCALENDAR`;
+
+  const blob = new Blob([icsContent], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  
   const link = document.createElement("a");
   link.href = url;
-  link.setAttribute("download", `evento-${event.id}.ics`);
+  link.download = `${event.title.toLowerCase().replace(/[^a-z0-9]/g, "-")}.ics`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
 
-function showToast(title, message, type = "success") {
+// ==========================================================================
+// TOAST NOTIFICATIONS
+// ==========================================================================
+function showToast(title, message, type = 'success') {
+  if (!dom.toastContainer) return;
+
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
 
@@ -1378,17 +1429,39 @@ function resetSuggestModal() {
 function renderSuggestPreviewCard(event) {
   if (!dom.previewCard) return;
 
-  // Actualizar indicador (presencial / virtual)
-  dom.previewIndicator.className = `event-card-type-indicator ${event.location_type}`;
+  // Actualizar indicador circular (presencial / virtual)
+  const indicator = dom.previewIndicator;
+  if (indicator) {
+    indicator.className = `event-badge-indicator ${event.location_type}`;
+    if (event.location_type === 'presencial') {
+      indicator.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      `;
+      indicator.title = 'Presencial';
+    } else {
+      indicator.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 7l-7 5 7 5V7z" />
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+        </svg>
+      `;
+      indicator.title = 'Virtual';
+    }
+  }
 
   // Título
   dom.previewCardTitle.textContent = event.title;
 
   // Tiempo
-  dom.previewCardTime.textContent = event.time_range + " hs";
-
-  // Ubicación
-  dom.previewLocationDetail.textContent = `${event.location_detail} (${event.location_city})`;
+  const parts = event.event_date.split('-');
+  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+  const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+  const formattedMonth = months[dateObj.getMonth()];
+  const formattedDate = `${dateObj.getDate()} ${formattedMonth} ${dateObj.getFullYear()}`;
+  dom.previewCardTime.textContent = `${formattedDate} - ${event.time_range}`;
 
   // Tags
   dom.previewTags.innerHTML = '';
