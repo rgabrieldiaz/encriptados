@@ -1,4 +1,4 @@
-import { getEvents, detectUserLocation } from './api/events.js';
+import { getEvents, detectUserLocation, supabase } from './api/events.js';
 
 // ==========================================================================
 // ESTADO GLOBAL DE LA APLICACIÓN
@@ -98,7 +98,24 @@ const dom = {
   prevDayBtn: document.getElementById('prev-day-btn'),
   nextDayBtn: document.getElementById('next-day-btn'),
   calendarDaysHeader: document.getElementById('calendar-days-header'),
-  monthGrid: document.getElementById('calendar-month-grid')
+  monthGrid: document.getElementById('calendar-month-grid'),
+
+  // Selectores para Sugerir Evento
+  btnSuggestTrigger: document.getElementById('btn-suggest-trigger'),
+  suggestModal: document.getElementById('suggest-modal'),
+  suggestCloseBtn: document.getElementById('suggest-close-btn'),
+  suggestForm: document.getElementById('suggest-form'),
+  suggestUrlInput: document.getElementById('suggest-url-input'),
+  suggestLoader: document.getElementById('suggest-loader'),
+  suggestError: document.getElementById('suggest-error'),
+  previewArea: document.getElementById('preview-area'),
+  previewCard: document.getElementById('preview-card'),
+  previewIndicator: document.getElementById('preview-indicator'),
+  previewTags: document.getElementById('preview-tags'),
+  previewCardTitle: document.getElementById('preview-card-title'),
+  previewCardTime: document.getElementById('preview-card-time'),
+  previewLocationDetail: document.getElementById('preview-location-detail'),
+  btnConfirmSave: document.getElementById('btn-confirm-save')
 };
 
 // ==========================================================================
@@ -1079,19 +1096,24 @@ function downloadIcsFile(event) {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Muestra una notificación Toast flotante con diseño glassmorphic y glow.
- */
 function showToast(title, message, type = "success") {
   const toast = document.createElement('div');
-  toast.className = 'toast';
+  toast.className = `toast toast-${type}`;
 
-  // Icono dinámico para el toast
+  const isDanger = type === 'danger' || type === 'error';
+  const iconHtml = isDanger 
+    ? `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+         <circle cx="12" cy="12" r="10"></circle>
+         <line x1="12" y1="8" x2="12" y2="12"></line>
+         <line x1="12" y1="16" x2="12.01" y2="16"></line>
+       </svg>`
+    : `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+         <polyline points="22 4 12 14.01 9 11.01"></polyline>
+       </svg>`;
+
   toast.innerHTML = `
-    <svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-      <polyline points="22 4 12 14.01 9 11.01"></polyline>
-    </svg>
+    ${iconHtml}
     <div class="toast-content">
       <span class="toast-title">${title}</span>
       <span class="toast-message">${message}</span>
@@ -1211,6 +1233,174 @@ function initLocationDropdown() {
 }
 
 // ==========================================================================
+// SUGERIR EVENTO: SCRAPING Y PREVISUALIZACIÓN CON IA
+// ==========================================================================
+
+function initSuggestModal() {
+  if (!dom.btnSuggestTrigger || !dom.suggestModal) return;
+
+  // Abrir modal al clickear disparador
+  dom.btnSuggestTrigger.addEventListener('click', () => {
+    dom.suggestModal.showModal();
+    resetSuggestModal();
+  });
+
+  // Cerrar al clickear botón de cerrar
+  dom.suggestCloseBtn.addEventListener('click', () => {
+    dom.suggestModal.close();
+    resetSuggestModal();
+  });
+
+  // Fallback de light-dismiss para navegadores que no lo soportan nativamente
+  if (!('closedBy' in HTMLDialogElement.prototype)) {
+    dom.suggestModal.addEventListener('click', (event) => {
+      if (event.target !== dom.suggestModal) return;
+      const rect = dom.suggestModal.getBoundingClientRect();
+      const isDialogContent = (
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width
+      );
+      if (!isDialogContent) {
+        dom.suggestModal.close();
+        resetSuggestModal();
+      }
+    });
+  }
+
+  // Interacción al enviar formulario
+  dom.suggestForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = dom.suggestUrlInput.value.trim();
+    if (!url) return;
+
+    // Resetear estados visuales
+    dom.suggestError.classList.add('hidden');
+    dom.previewArea.classList.add('hidden');
+    dom.suggestLoader.classList.remove('hidden');
+    dom.suggestForm.classList.add('hidden'); // Ocultar input durante carga
+
+    try {
+      if (!supabase) {
+        throw new Error("El cliente de base de datos no está inicializado.");
+      }
+
+      console.log(`Invocando suggest-event Edge Function para: ${url}`);
+      const { data, error } = await supabase.functions.invoke('suggest-event', {
+        body: { url }
+      });
+
+      if (error) {
+        // Intentar parsear el JSON de error si existe
+        let errorMsg = "Error al analizar el evento con IA.";
+        try {
+          const bodyErr = JSON.parse(error.message);
+          errorMsg = bodyErr.error || errorMsg;
+        } catch {
+          errorMsg = error.message || errorMsg;
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (!data) {
+        throw new Error("No se devolvieron datos para este evento.");
+      }
+
+      // Guardar temporalmente en el estado global para guardar al confirmar
+      state.lastScrapedEvent = data;
+
+      // Renderizar vista previa 3D de la tarjeta
+      renderSuggestPreviewCard(data);
+
+      // Mostrar previsualización
+      dom.previewArea.classList.remove('hidden');
+    } catch (err) {
+      console.error(err);
+      dom.suggestError.textContent = err.message || "Ocurrió un error inesperado al analizar el evento.";
+      dom.suggestError.classList.remove('hidden');
+      dom.suggestForm.classList.remove('hidden'); // Volver a mostrar form en caso de error
+    } finally {
+      dom.suggestLoader.classList.add('hidden');
+    }
+  });
+
+  // Confirmar y Guardar en la base de datos
+  dom.btnConfirmSave.addEventListener('click', async () => {
+    if (!state.lastScrapedEvent) return;
+
+    dom.btnConfirmSave.disabled = true;
+    const originalText = dom.btnConfirmSave.innerHTML;
+    dom.btnConfirmSave.innerHTML = `
+      <div class="cyber-spinner" style="width: 14px; height: 14px; border-width: 2px; border-top-color: var(--neon-cyan); border-bottom-color: var(--neon-purple); display: inline-block; vertical-align: middle;"></div>
+      <span style="vertical-align: middle; margin-left: 6px;">Guardando...</span>
+    `;
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .insert(state.lastScrapedEvent);
+
+      if (error) {
+        // Manejar duplicado de luma_url
+        if (error.code === '23505') {
+          throw new Error("Este evento ya ha sido registrado previamente.");
+        }
+        throw new Error(error.message || "No se pudo guardar el evento en la base de datos.");
+      }
+
+      // Éxito
+      showToast("EVENTO AGREGADO", `"${state.lastScrapedEvent.title}" se publicó correctamente.`, "success");
+      dom.suggestModal.close();
+      resetSuggestModal();
+
+      // Forzar recarga de los eventos en la grilla y el calendario
+      await loadEventsForCurrentWeek();
+    } catch (err) {
+      console.error(err);
+      showToast("ERROR AL PUBLICAR", err.message, "danger");
+      dom.btnConfirmSave.innerHTML = originalText;
+      dom.btnConfirmSave.disabled = false;
+    }
+  });
+}
+
+function resetSuggestModal() {
+  dom.suggestForm.reset();
+  dom.suggestForm.classList.remove('hidden');
+  dom.suggestLoader.classList.add('hidden');
+  dom.suggestError.classList.add('hidden');
+  dom.previewArea.classList.add('hidden');
+  state.lastScrapedEvent = null;
+  dom.btnConfirmSave.disabled = false;
+}
+
+function renderSuggestPreviewCard(event) {
+  if (!dom.previewCard) return;
+
+  // Actualizar indicador (presencial / virtual)
+  dom.previewIndicator.className = `event-card-type-indicator ${event.location_type}`;
+
+  // Título
+  dom.previewCardTitle.textContent = event.title;
+
+  // Tiempo
+  dom.previewCardTime.textContent = event.time_range + " hs";
+
+  // Ubicación
+  dom.previewLocationDetail.textContent = `${event.location_detail} (${event.location_city})`;
+
+  // Tags
+  dom.previewTags.innerHTML = '';
+  event.tags.forEach(tag => {
+    const span = document.createElement('span');
+    span.className = `event-tag tag-${tag.toLowerCase()}`;
+    span.textContent = `#${tag}`;
+    dom.previewTags.appendChild(span);
+  });
+}
+
+// ==========================================================================
 // INICIALIZACIÓN DE LA APLICACIÓN
 // ==========================================================================
 async function initApp() {
@@ -1244,6 +1434,9 @@ async function initApp() {
   window.addEventListener('resize', () => {
     setupCard3DInteractions();
   });
+
+  // Inicializar modal de sugerencias
+  initSuggestModal();
 
   // 5. Autodetección de Ubicación por IP (Simulación)
   try {

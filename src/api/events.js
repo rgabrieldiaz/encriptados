@@ -154,17 +154,68 @@ export const mockEvents = [
   }
 ];
 
+// Configuración de Supabase (Cliente público / anon)
+const supabaseUrl = "https://lzylaqhjrcfflrbucjdv.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6eWxhcWhqcmNmZmxyYnVjamR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzE0NDgsImV4cCI6MjA5NTQwNzQ0OH0.xNW1E3YzQ7j-mfsdueYVBgxbHwK9QAHymSlB4dtLt5Q";
+
+export const supabase = window.supabase 
+  ? window.supabase.createClient(supabaseUrl, supabaseKey) 
+  : null;
+
 /**
- * Obtiene los eventos filtrados por ciudad y con fechas mapeadas dinámicamente
- * al lunes de la semana actual enfocada por el calendario.
+ * Obtiene los eventos filtrados por ciudad y con fechas mapeadas dinámicamente.
+ * Consulta primero la base de datos de Supabase. Si está vacía o hay un error,
+ * recurre a los eventos mock como fallback de resiliencia.
  *
  * @param {string} city Ciudad seleccionada
- * @param {Date} referenceDate Fecha de referencia del calendario (por defecto hoy)
+ * @param {Date} referenceDate Fecha de referencia del calendario
  */
 export async function getEvents(city, referenceDate = new Date()) {
-  // Simular latencia de red
-  await new Promise(resolve => setTimeout(resolve, 300));
+  // Rango de consulta: +/- 35 días de la fecha de referencia para cubrir vistas mensual y semanal
+  const startDate = new Date(referenceDate);
+  startDate.setDate(startDate.getDate() - 35);
+  const endDate = new Date(referenceDate);
+  endDate.setDate(endDate.getDate() + 35);
 
+  const startDateStr = startDate.toISOString().split('T')[0];
+  const endDateStr = endDate.toISOString().split('T')[0];
+
+  let dbEvents = [];
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('location_city', city)
+        .gte('event_date', startDateStr)
+        .lte('event_date', endDateStr);
+
+      if (!error && data && data.length > 0) {
+        dbEvents = data.map(e => ({
+          id: e.id,
+          title: e.title,
+          dayOfWeek: e.day_of_week,
+          time: e.time_range,
+          location_type: e.location_type,
+          location_city: e.location_city,
+          location_detail: e.location_detail,
+          tags: e.tags,
+          description: e.description,
+          date: e.event_date // Formato YYYY-MM-DD
+        }));
+        console.log(`Cargados ${dbEvents.length} eventos reales desde Supabase para ${city}.`);
+        return dbEvents;
+      } else if (error) {
+        console.error("Error al consultar eventos en Supabase:", error.message);
+      }
+    } catch (err) {
+      console.error("Excepción al consultar Supabase:", err);
+    }
+  }
+
+  // Fallback a eventos mock si no hay datos en Supabase
+  console.log("No se obtuvieron eventos de Supabase. Usando fallback de eventos de prueba.");
   const filtered = mockEvents.filter(e => e.location_city === city);
 
   // Calcular el lunes de la semana que contiene a referenceDate
@@ -184,7 +235,6 @@ export async function getEvents(city, referenceDate = new Date()) {
 
   const daysOrder = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-  // Mapear los eventos estáticos a las fechas dinámicas correspondientes a esa semana
   return filtered.map(event => {
     const idx = daysOrder.indexOf(event.dayOfWeek);
     const eventDate = new Date(monday);
@@ -201,7 +251,25 @@ export async function getEvents(city, referenceDate = new Date()) {
  * Simula la detección de ubicación del usuario basada en IP.
  */
 export async function detectUserLocation() {
-  await new Promise(resolve => setTimeout(resolve, 400));
+  try {
+    const res = await fetch("https://ipapi.co/json/");
+    if (res.ok) {
+      const data = await res.json();
+      // Mapear país/ciudad a las opciones soportadas
+      const country = data.country_code; // AR, CO, CL, etc.
+      const city = data.city;
+      
+      if (country === 'CO' || city === 'Bogota' || city === 'Bogotá') {
+        return { city: "Bogotá", cityName: "Bogotá, Colombia" };
+      } else if (country === 'CL' || city === 'Santiago') {
+        return { city: "Santiago", cityName: "Santiago, Chile" };
+      }
+    }
+  } catch (e) {
+    console.warn("Error al autodetectar IP:", e.message);
+  }
+  
+  // Default fallback
   return {
     city: "AMBA",
     cityName: "Buenos Aires (AMBA)"
