@@ -117,7 +117,8 @@ const dom = {
   confirmTime: document.getElementById('confirm-time'),
   confirmPrice: document.getElementById('confirm-price'),
   confirmType: document.getElementById('confirm-type'),
-  confirmLocation: document.getElementById('confirm-location')
+  confirmLocation: document.getElementById('confirm-location'),
+  confirmPosterImg: document.getElementById('confirm-poster-img')
 };
 
 // ==========================================================================
@@ -1467,6 +1468,37 @@ function initSuggestModal() {
         throw new Error("El cliente de base de datos no está inicializado.");
       }
 
+      // Verificar si el evento ya está registrado para evitar duplicados
+      let urlObj;
+      try {
+        urlObj = new URL(url);
+      } catch {
+        try {
+          urlObj = new URL(`https://${url}`);
+        } catch {
+          throw new Error("Por favor, ingresa una URL válida de Lu.ma");
+        }
+      }
+      
+      const cleanPath = urlObj.pathname.replace(/\/+$/, '');
+      if (!cleanPath || cleanPath === '/') {
+        throw new Error("URL de Luma no válida.");
+      }
+
+      const { data: existing, error: checkError } = await supabase
+        .from('events')
+        .select('title')
+        .ilike('luma_url', `%${cleanPath}%`)
+        .limit(1);
+
+      if (checkError) {
+        console.error("Error verificando duplicados:", checkError.message);
+      }
+
+      if (existing && existing.length > 0) {
+        throw new Error(`Este evento ("${existing[0].title}") ya ha sido registrado previamente.`);
+      }
+
       console.log(`Invocando suggest-event Edge Function para: ${url}`);
       const { data, error } = await supabase.functions.invoke('suggest-event', {
         body: { url }
@@ -1589,6 +1621,11 @@ function renderSuggestPreviewCard(event) {
     const formattedMonth = months[dateObj.getMonth()];
     const formattedDate = `${dateObj.getDate()} ${formattedMonth} ${dateObj.getFullYear()}`;
     dom.confirmTime.textContent = `${formattedDate} - ${event.time_range} hs`;
+  }
+
+  // Poster / Imagen
+  if (dom.confirmPosterImg) {
+    dom.confirmPosterImg.src = event.cover_url || 'src/assets/event-placeholder.png';
   }
 }
 

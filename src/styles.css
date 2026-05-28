@@ -1178,16 +1178,52 @@ body {
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
 }
 
-/* Suggest Confirmation Details Table */
+/* Suggest Confirmation Layout */
+.suggest-confirm-container {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+
 .suggest-confirm-details {
+  flex: 1.6;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 16px 20px;
-  margin-bottom: 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.suggest-confirm-poster {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  padding: 8px;
+}
+
+#confirm-poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  aspect-ratio: 1 / 1;
+  max-width: 180px;
+  max-height: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease;
+}
+
+#confirm-poster-img:hover {
+  transform: scale(1.03);
 }
 
 .suggest-confirm-details .detail-row {
@@ -1221,6 +1257,23 @@ body {
   word-break: break-word;
   line-height: 1.4;
   font-weight: 500;
+}
+
+/* Responsive details layout */
+@media (max-width: 576px) {
+  .suggest-confirm-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  .suggest-confirm-details {
+    width: 100%;
+    order: 2;
+  }
+  .suggest-confirm-poster {
+    width: 100%;
+    max-width: 220px;
+    order: 1;
+  }
 }
 
 /* ==========================================================================
