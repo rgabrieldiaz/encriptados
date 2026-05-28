@@ -6,21 +6,17 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Función para buscar recursivamente el objeto del evento en NEXT_DATA
-function findEventInNextData(obj: any): any {
+// Función para buscar recursivamente el contenedor del evento (initialData) en NEXT_DATA
+function findEventContainer(obj: any): any {
   if (!obj || typeof obj !== 'object') return null;
   
-  if (obj.api_event && obj.api_event.name) {
-    return obj.api_event;
-  }
-
-  if (obj.event && obj.event.name && obj.event.start_at) {
-    return obj.event;
+  if ((obj.api_event && obj.api_event.name) || (obj.event && obj.event.name && obj.event.start_at)) {
+    return obj;
   }
   
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const result = findEventInNextData(obj[key]);
+      const result = findEventContainer(obj[key]);
       if (result) return result;
     }
   }
@@ -62,16 +58,18 @@ serve(async (req) => {
     
     // 2. Extraer __NEXT_DATA__
     const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    let rawEvent = null;
+    let eventContainer = null;
 
     if (nextDataMatch) {
       try {
         const nextData = JSON.parse(nextDataMatch[1]);
-        rawEvent = findEventInNextData(nextData);
+        eventContainer = findEventContainer(nextData);
       } catch (err) {
         console.warn("Error parseando __NEXT_DATA__ JSON:", err);
       }
     }
+
+    const rawEvent = eventContainer?.api_event || eventContainer?.event;
 
     // Fallbacks
     const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/);
@@ -89,9 +87,107 @@ serve(async (req) => {
                         rawEvent?.geo_address_info?.full_address || 
                         rawEvent?.geo_address_info?.address || 
                         'Virtual';
-    const rawDate = rawEvent?.start_at || 'Hoy';
 
-    // 3. Enriquecer con Gemini
+    // 3. Extracción de Flyer, Host, y Precio
+    const coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
+    const hostName = eventContainer?.calendar?.name || eventContainer?.hosts?.[0]?.name || '';
+    
+    const ticketInfo = eventContainer?.ticket_info;
+    let priceStr = 'Gratis';
+    if (ticketInfo) {
+      if (ticketInfo.is_free) {
+        priceStr = 'Gratis';
+      } else if (ticketInfo.price && ticketInfo.price.formatted_cents) {
+        priceStr = ticketInfo.price.formatted_cents;
+      } else if (ticketInfo.price && ticketInfo.price.cents) {
+        const symbol = ticketInfo.price.currency === 'USD' ? '$' : ticketInfo.price.currency || '$';
+        priceStr = `${symbol}${(ticketInfo.price.cents / 100).toFixed(2)}`;
+      } else {
+        priceStr = 'De pago';
+      }
+    }
+
+    // 4. Fechas y Horas locales precalculadas
+    const rawStartDate = rawEvent?.start_at;
+    const rawEndDate = rawEvent?.end_at;
+    const rawTimezone = rawEvent?.timezone || 'America/Argentina/Buenos_Aires';
+
+    let localDate = '';
+    let localTimeRange = '19:00 - 21:00';
+    let localDayOfWeek = 'MON';
+
+    const weekdayMap: Record<string, string> = {
+      'MON': 'MON', 'TUE': 'TUE', 'WED': 'WED', 'THU': 'THU', 'FRI': 'FRI', 'SAT': 'SAT', 'SUN': 'SUN',
+      'LUN': 'MON', 'MAR': 'TUE', 'MIÉ': 'WED', 'JUE': 'THU', 'VIE': 'FRI', 'SÁB': 'SAT', 'DOM': 'SUN',
+      'MON.': 'MON', 'TUE.': 'TUE', 'WED.': 'WED', 'THU.': 'THU', 'FRI.': 'FRI', 'SAT.': 'SAT', 'SUN.': 'SUN'
+    };
+
+    if (rawStartDate) {
+      try {
+        const startDate = new Date(rawStartDate);
+        
+        // Date: YYYY-MM-DD
+        const dateParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: rawTimezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          weekday: 'short'
+        }).formatToParts(startDate);
+
+        const y = dateParts.find(p => p.type === 'year')?.value;
+        const m = dateParts.find(p => p.type === 'month')?.value;
+        const d = dateParts.find(p => p.type === 'day')?.value;
+        localDate = `${y}-${m}-${d}`;
+
+        const wd = dateParts.find(p => p.type === 'weekday')?.value;
+        const shortDay = wd ? wd.toUpperCase().replace('.', '') : 'MON';
+        localDayOfWeek = weekdayMap[shortDay] || shortDay;
+        if (localDayOfWeek === 'THR') localDayOfWeek = 'THU';
+
+        // Time range
+        const startTimeStr = new Intl.DateTimeFormat('en-US', {
+          timeZone: rawTimezone,
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).format(startDate);
+
+        let endTimeStr = '';
+        if (rawEndDate) {
+          const endDate = new Date(rawEndDate);
+          endTimeStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: rawTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(endDate);
+        } else {
+          // Por defecto 2 horas
+          const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+          endTimeStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: rawTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(endDate);
+        }
+
+        localTimeRange = `${startTimeStr} - ${endTimeStr}`;
+      } catch (err) {
+        console.error("Error al precalcular las fechas con la zona horaria:", err);
+      }
+    }
+
+    // 5. Regla de Privacidad de Ubicación
+    const isPrivateAddress = rawEvent?.geo_address_visibility && rawEvent.geo_address_visibility !== 'public';
+    const rawLocationStr = rawLocation || '';
+    const isAddressPrivate = isPrivateAddress || 
+                             /visible after/i.test(rawLocationStr) || 
+                             /se revela/i.test(rawLocationStr) ||
+                             /tras aprobación/i.test(rawLocationStr);
+
+    // 6. Enriquecer con Gemini 2.5 Flash
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiApiKey) {
       return new Response(
@@ -118,14 +214,20 @@ Tu trabajo es procesar información desestructurada de un evento extraído de Lu
 
 Reglas críticas:
 1. "location_city" debe ser "AMBA" si la ubicación es en Buenos Aires (CABA, Buenos Aires, AMBA, Argentina). Usa "Bogotá" para Bogotá (Colombia) y "Santiago" para Santiago (Chile). Si no coincide con ninguna y no es virtual, marca "is_valid": false.
-2. Estandariza la fecha "event_date" basada en la fecha provista "${rawDate}". Si está en formato ISO (ej: 2026-05-27T21:30:00.000Z), conviértela a la zona horaria local de Sudamérica (UTC-3).
-3. Devuelve únicamente el objeto JSON bien formado sin rodeos de texto ni markdown.`;
+2. Utiliza exactamente el valor de "Fecha local precalculada" en "event_date".
+3. Utiliza exactamente el valor de "Día de la semana precalculado" en "day_of_week".
+4. Utiliza exactamente el valor de "Rango horario precalculado" en "time_range".
+5. Regla de Privacidad de Ubicación: Si "Ubicación Privada" es "Sí", debes establecer "location_detail" exactamente como "Ubicación visible tras aprobación" y NO revelar ninguna calle o dirección específica en el JSON.
+6. Devuelve únicamente el objeto JSON bien formado sin rodeos de texto ni markdown.`;
 
     const userPrompt = `URL: ${url}
 Título extraído: ${title}
 Descripción extraída: ${description.slice(0, 1500)}
 Ubicación cruda: ${rawLocation}
-Fecha cruda: ${rawDate}`;
+Ubicación Privada: ${isAddressPrivate ? 'Sí' : 'No'}
+Fecha local precalculada: ${localDate}
+Día de la semana precalculado: ${localDayOfWeek}
+Rango horario precalculado: ${localTimeRange}`;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
@@ -203,6 +305,9 @@ Fecha cruda: ${rawDate}`;
         location_city: parsedResult.location_city,
         location_detail: parsedResult.location_detail,
         tags: parsedResult.tags,
+        cover_url: coverUrl,
+        host_name: hostName,
+        price_info: priceStr,
         luma_url: url
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

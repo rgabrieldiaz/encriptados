@@ -397,7 +397,7 @@ function createEventCard(event) {
   const thumbContainer = document.createElement('div');
   thumbContainer.className = 'event-card-thumb';
   const thumbImg = document.createElement('img');
-  thumbImg.src = 'src/assets/event-placeholder.png';
+  thumbImg.src = event.cover_url || 'src/assets/event-placeholder.png';
   thumbImg.alt = event.title;
   thumbContainer.appendChild(thumbImg);
   card.appendChild(thumbContainer);
@@ -407,6 +407,31 @@ function createEventCard(event) {
   title.className = 'event-card-title';
   title.textContent = event.title;
   card.appendChild(title);
+
+  // 2b. Fila de Host y Precio
+  const hostAndPriceRow = document.createElement('div');
+  hostAndPriceRow.className = 'event-card-host-price';
+  
+  if (event.host_name) {
+    const hostSpan = document.createElement('span');
+    hostSpan.className = 'event-card-host';
+    hostSpan.textContent = `Host: ${event.host_name}`;
+    hostSpan.title = event.host_name;
+    hostAndPriceRow.appendChild(hostSpan);
+  }
+  
+  if (event.price_info) {
+    const priceSpan = document.createElement('span');
+    priceSpan.className = 'event-card-price';
+    priceSpan.textContent = event.price_info;
+    const isFree = event.price_info.toLowerCase().includes('gratis') || event.price_info.toLowerCase().includes('free');
+    priceSpan.classList.add(isFree ? 'price-free' : 'price-paid');
+    hostAndPriceRow.appendChild(priceSpan);
+  }
+  
+  if (event.host_name || event.price_info) {
+    card.appendChild(hostAndPriceRow);
+  }
 
   // 3. Horario (comienzo y fin)
   const parts = event.date.split('-');
@@ -1248,6 +1273,18 @@ let currentActiveModalEventId = null;
 function openEventModal(event) {
   currentActiveModalEventId = event.id;
   
+  // Renderizar Flyer
+  const coverContainer = document.getElementById('modal-cover-container');
+  const coverImg = document.getElementById('modal-cover-img');
+  if (coverContainer && coverImg) {
+    if (event.cover_url) {
+      coverImg.src = event.cover_url;
+      coverContainer.classList.remove('hidden');
+    } else {
+      coverContainer.classList.add('hidden');
+    }
+  }
+
   // Renderizar tags
   dom.modalTags.innerHTML = '';
   event.tags.forEach(tag => {
@@ -1269,6 +1306,29 @@ function openEventModal(event) {
   dom.modalTime.textContent = `${event.time} hs`;
   dom.modalLocation.textContent = `${event.location_detail} (${event.location_city})`;
   dom.modalDescription.textContent = event.description;
+
+  // Renderizar Host y Precio
+  const hostItem = document.getElementById('modal-host-item');
+  const hostSpan = document.getElementById('modal-host');
+  if (hostItem && hostSpan) {
+    if (event.host_name) {
+      hostSpan.textContent = `Organizado por: ${event.host_name}`;
+      hostItem.classList.remove('hidden');
+    } else {
+      hostItem.classList.add('hidden');
+    }
+  }
+
+  const priceItem = document.getElementById('modal-price-item');
+  const priceSpan = document.getElementById('modal-price');
+  if (priceItem && priceSpan) {
+    if (event.price_info) {
+      priceSpan.textContent = event.price_info;
+      priceItem.classList.remove('hidden');
+    } else {
+      priceItem.classList.add('hidden');
+    }
+  }
 
   // Actualizar botón de acción del modal
   const isAdded = state.userCalendar.includes(event.id);
@@ -1485,6 +1545,12 @@ function resetSuggestModal() {
 function renderSuggestPreviewCard(event) {
   if (!dom.previewCard) return;
 
+  // Miniatura / Flyer
+  const previewThumbImg = dom.previewCard.querySelector('.event-card-thumb img');
+  if (previewThumbImg) {
+    previewThumbImg.src = event.cover_url || 'src/assets/event-placeholder.png';
+  }
+
   // Actualizar indicador circular (presencial / virtual)
   const indicator = dom.previewIndicator;
   if (indicator) {
@@ -1510,6 +1576,32 @@ function renderSuggestPreviewCard(event) {
 
   // Título
   dom.previewCardTitle.textContent = event.title;
+
+  // Host y Precio
+  const previewHostPrice = document.getElementById('preview-host-price');
+  const previewHost = document.getElementById('preview-host');
+  const previewPrice = document.getElementById('preview-price');
+  if (previewHostPrice && previewHost && previewPrice) {
+    if (event.host_name || event.price_info) {
+      if (event.host_name) {
+        previewHost.textContent = `Host: ${event.host_name}`;
+        previewHost.classList.remove('hidden');
+      } else {
+        previewHost.classList.add('hidden');
+      }
+      if (event.price_info) {
+        previewPrice.textContent = event.price_info;
+        const isFree = event.price_info.toLowerCase().includes('gratis') || event.price_info.toLowerCase().includes('free');
+        previewPrice.className = `event-card-price ${isFree ? 'price-free' : 'price-paid'}`;
+        previewPrice.classList.remove('hidden');
+      } else {
+        previewPrice.classList.add('hidden');
+      }
+      previewHostPrice.classList.remove('hidden');
+    } else {
+      previewHostPrice.classList.add('hidden');
+    }
+  }
 
   // Tiempo
   const parts = event.event_date.split('-');

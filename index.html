@@ -189,6 +189,9 @@
         </svg>
       </button>
       <div class="modal-content">
+        <div class="modal-cover-container hidden" id="modal-cover-container">
+          <img class="modal-cover-img" id="modal-cover-img" src="" alt="Flyer del evento" />
+        </div>
         <div class="modal-header-tags" id="modal-tags">
           <!-- Tags dinámicos -->
         </div>
@@ -216,6 +219,20 @@
               <circle cx="12" cy="10" r="3" />
             </svg>
             <span id="modal-location">Palermo, CABA</span>
+          </div>
+          <div class="meta-item hidden" id="modal-host-item">
+            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span id="modal-host">Host</span>
+          </div>
+          <div class="meta-item hidden" id="modal-price-item">
+            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+              <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            </svg>
+            <span id="modal-price">Precio</span>
           </div>
         </div>
         <p class="modal-description" id="modal-description">Descripción detallada del evento...</p>
@@ -285,6 +302,10 @@
                 <img src="src/assets/event-placeholder.png" alt="Miniatura del evento" />
               </div>
               <h3 class="event-card-title" id="preview-card-title">Título del Evento</h3>
+              <div class="event-card-host-price hidden" id="preview-host-price">
+                <span class="event-card-host" id="preview-host">Host</span>
+                <span class="event-card-price price-free" id="preview-price">Gratis</span>
+              </div>
               <span class="event-card-time" id="preview-card-time">Fecha - Horario hs</span>
               <div class="event-card-meta-row">
                 <div class="event-card-tags" id="preview-tags">
