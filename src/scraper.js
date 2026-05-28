@@ -195,7 +195,12 @@ export async function scrapeSingleLumaEvent(url, defaultCity = 'AMBA') {
                         'Virtual';
 
     // Extracción de Flyer, Host, y Precio
-    const coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
+    let coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
+    if (!coverUrl) {
+      coverUrl = $('meta[property="og:image"]').attr('content') || 
+                 $('meta[name="twitter:image"]').attr('content') || 
+                 '';
+    }
     const hostName = eventContainer?.calendar?.name || eventContainer?.hosts?.[0]?.name || '';
     
     const ticketInfo = eventContainer?.ticket_info;

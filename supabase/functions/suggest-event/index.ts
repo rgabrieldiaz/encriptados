@@ -89,7 +89,20 @@ serve(async (req) => {
                         'Virtual';
 
     // 3. Extracción de Flyer, Host, y Precio
-    const coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
+    let coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
+    if (!coverUrl) {
+      const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+      if (ogMatch) {
+        coverUrl = ogMatch[1];
+      } else {
+        const twitterMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
+                             html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
+        if (twitterMatch) {
+          coverUrl = twitterMatch[1];
+        }
+      }
+    }
     const hostName = eventContainer?.calendar?.name || eventContainer?.hosts?.[0]?.name || '';
     
     const ticketInfo = eventContainer?.ticket_info;
