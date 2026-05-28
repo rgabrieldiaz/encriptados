@@ -191,7 +191,11 @@ export async function scrapeSingleLumaEvent(url, defaultCity = 'AMBA') {
       defaultCity,
       title: rawEvent?.name || pageTitle,
       description: rawEvent?.description || pageText.slice(0, 3000),
-      rawLocation: rawEvent?.location?.address || rawEvent?.location?.name || 'Virtual',
+      rawLocation: rawEvent?.location?.address || 
+                   rawEvent?.location?.name || 
+                   rawEvent?.geo_address_info?.full_address || 
+                   rawEvent?.geo_address_info?.address || 
+                   'Virtual',
       rawDate: rawEvent?.start_at || 'Hoy'
     });
 
@@ -210,6 +214,10 @@ function findEventInNextData(obj) {
   
   if (obj.api_event && obj.api_event.name) {
     return obj.api_event;
+  }
+
+  if (obj.event && obj.event.name && obj.event.start_at) {
+    return obj.event;
   }
   
   for (const key in obj) {

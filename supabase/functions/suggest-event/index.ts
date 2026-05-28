@@ -13,6 +13,10 @@ function findEventInNextData(obj: any): any {
   if (obj.api_event && obj.api_event.name) {
     return obj.api_event;
   }
+
+  if (obj.event && obj.event.name && obj.event.start_at) {
+    return obj.event;
+  }
   
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -80,7 +84,11 @@ serve(async (req) => {
 
     const title = rawEvent?.name || pageTitle;
     const description = rawEvent?.description || bodyText;
-    const rawLocation = rawEvent?.location?.address || rawEvent?.location?.name || 'Virtual';
+    const rawLocation = rawEvent?.location?.address || 
+                        rawEvent?.location?.name || 
+                        rawEvent?.geo_address_info?.full_address || 
+                        rawEvent?.geo_address_info?.address || 
+                        'Virtual';
     const rawDate = rawEvent?.start_at || 'Hoy';
 
     // 3. Enriquecer con Gemini
