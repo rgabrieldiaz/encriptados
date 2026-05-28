@@ -349,9 +349,22 @@ function renderEvents() {
     }
   });
 
-  // 2. Insertar las tarjetas en la columna correcta
+  // 2. Insertar las tarjetas en la columna correcta de la semana seleccionada
   state.events.forEach(event => {
-    const column = Array.from(dom.columns).find(col => col.getAttribute('data-day') === event.dayOfWeek);
+    const day = event.dayOfWeek;
+    const colDate = weekDates[day];
+    if (!colDate) return;
+
+    // Formatear la fecha del día de la columna de esta semana
+    const yyyy = colDate.getFullYear();
+    const mm = String(colDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(colDate.getDate()).padStart(2, '0');
+    const colDateStr = `${yyyy}-${mm}-${dd}`;
+
+    // Si la fecha del evento no coincide con el día real de la columna para esta semana, no se dibuja
+    if (event.date !== colDateStr) return;
+
+    const column = Array.from(dom.columns).find(col => col.getAttribute('data-day') === day);
     if (!column) return;
 
     column.classList.add('has-events');
@@ -445,7 +458,17 @@ function createEventCard(event) {
   
   const time = document.createElement('span');
   time.className = 'event-card-time';
-  time.textContent = `${formattedDate} - ${event.time}`;
+  
+  const dateSpan = document.createElement('span');
+  dateSpan.className = 'event-card-date-part';
+  dateSpan.textContent = `${formattedDate} - `;
+  
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'event-card-time-part';
+  timeSpan.textContent = event.time;
+  
+  time.appendChild(dateSpan);
+  time.appendChild(timeSpan);
   card.appendChild(time);
 
   // 4. Fila de metadatos (Hashtags + Indicador de Tipo)

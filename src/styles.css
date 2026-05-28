@@ -2114,4 +2114,12 @@ dialog[open] {
   object-fit: cover;
 }
 
+/* Ocultar elementos específicos en las tarjetas de la vista semanal (agenda semanal) */
+.view-semanal .event-card .event-card-action,
+.view-semanal .event-card .event-card-date-part,
+.view-semanal .event-card .event-card-host-price,
+.view-semanal .event-card .event-card-meta-row {
+  display: none !important;
+}
+
 
