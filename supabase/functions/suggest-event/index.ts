@@ -127,7 +127,7 @@ Descripción extraída: ${description.slice(0, 1500)}
 Ubicación cruda: ${rawLocation}
 Fecha cruda: ${rawDate}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: 'POST',
@@ -156,8 +156,15 @@ Fecha cruda: ${rawDate}`;
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error("Gemini API Error:", errText);
+      let errorDetail = "Error al invocar la API de Gemini";
+      try {
+        const parsed = JSON.parse(errText);
+        errorDetail = parsed.error?.message || parsed.error || errText;
+      } catch {
+        errorDetail = errText || errorDetail;
+      }
       return new Response(
-        JSON.stringify({ error: "Error al invocar la API de Gemini" }),
+        JSON.stringify({ error: `Error de Gemini: ${errorDetail}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
