@@ -1706,7 +1706,7 @@ dialog.suggest-modal-dialog {
   margin: auto;
   overflow: visible;
   box-shadow: none;
-  max-width: 480px;
+  max-width: 680px;
   width: calc(100% - 32px);
 }
 

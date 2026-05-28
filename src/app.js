@@ -1451,11 +1451,14 @@ function initSuggestModal() {
     });
   }
 
-  // Interacción al enviar formulario
   dom.suggestForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const url = dom.suggestUrlInput.value.trim();
+    let url = dom.suggestUrlInput.value.trim();
     if (!url) return;
+
+    // Limpiar parámetros de seguimiento y hashes (?tk=, etc.)
+    url = url.split('?')[0].split('#')[0];
+    dom.suggestUrlInput.value = url;
 
     // Resetear estados visuales
     dom.suggestError.classList.add('hidden');

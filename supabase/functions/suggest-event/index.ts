@@ -30,13 +30,16 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json();
+    let { url } = await req.json();
     if (!url) {
       return new Response(
         JSON.stringify({ error: "Falta la URL del evento" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Clean URL query parameters and hashes (such as ?tk=)
+    url = url.split('?')[0].split('#')[0];
 
     console.log(`Procesando sugerencia para URL: ${url}`);
 
