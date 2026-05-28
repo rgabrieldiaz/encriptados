@@ -421,18 +421,34 @@ function layoutDayEvents(dayEvents) {
  * Asegura que exista el sidebar de horas dentro de la columna diaria.
  */
 function ensureHoursSidebar(column) {
-  let sidebar = column.querySelector('.hours-sidebar');
-  if (!sidebar) {
-    sidebar = document.createElement('div');
-    sidebar.className = 'hours-sidebar';
+  // Sidebar Izquierda
+  let leftSidebar = column.querySelector('.hours-sidebar-left');
+  if (!leftSidebar) {
+    leftSidebar = document.createElement('div');
+    leftSidebar.className = 'hours-sidebar-left';
     for (let h = 0; h < 24; h++) {
       const hourLabel = document.createElement('div');
       hourLabel.className = 'hour-label';
       hourLabel.style.top = `calc(${h} * var(--hour-height))`;
       hourLabel.textContent = `${String(h).padStart(2, '0')}:00`;
-      sidebar.appendChild(hourLabel);
+      leftSidebar.appendChild(hourLabel);
     }
-    column.appendChild(sidebar);
+    column.appendChild(leftSidebar);
+  }
+
+  // Sidebar Derecha
+  let rightSidebar = column.querySelector('.hours-sidebar-right');
+  if (!rightSidebar) {
+    rightSidebar = document.createElement('div');
+    rightSidebar.className = 'hours-sidebar-right';
+    for (let h = 0; h < 24; h++) {
+      const hourLabel = document.createElement('div');
+      hourLabel.className = 'hour-label';
+      hourLabel.style.top = `calc(${h} * var(--hour-height))`;
+      hourLabel.textContent = `${String(h).padStart(2, '0')}:00`;
+      rightSidebar.appendChild(hourLabel);
+    }
+    column.appendChild(rightSidebar);
   }
 }
 

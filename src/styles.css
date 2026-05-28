@@ -2125,15 +2125,16 @@ dialog[open] {
   display: none !important;
 }
 
-/* Ocultar sidebar de horas por defecto */
-.hours-sidebar {
+/* Ocultar sidebars de horas por defecto */
+.hours-sidebar-left,
+.hours-sidebar-right {
   display: none !important;
 }
 
 /* Vista Diaria - Agenda Horaria y Solapamientos */
 .calendar-grid.view-diario {
   grid-template-columns: 1fr;
-  max-width: 450px; /* Contenedor angosto para una agenda diaria estética */
+  max-width: 100%; /* Aprovechar el ancho completo */
   margin: 0 auto;
   min-height: auto;
 }
@@ -2142,7 +2143,7 @@ dialog[open] {
   display: none;
   background: rgba(14, 14, 25, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.04) !important;
-  padding: 16px 16px 16px 8px !important;
+  padding: 16px 8px !important; /* Padding simétrico */
   border-radius: 14px;
   max-height: 600px;
   overflow-y: auto;
@@ -2167,33 +2168,51 @@ dialog[open] {
   animation: fadeInDay 0.4s ease-out;
 }
 
-/* Sidebar de horas a la derecha */
-.calendar-grid.view-diario .hours-sidebar {
+/* Sidebars de horas a la izquierda y derecha */
+.calendar-grid.view-diario .hours-sidebar-left,
+.calendar-grid.view-diario .hours-sidebar-right {
   display: block !important;
   position: absolute;
-  right: 0;
   top: 16px; /* Alinear con el padding superior de la columna */
   width: 70px;
   height: calc(24 * var(--hour-height));
-  border-left: 1px solid rgba(255, 255, 255, 0.05);
   pointer-events: none;
   z-index: 2;
 }
 
+.calendar-grid.view-diario .hours-sidebar-left {
+  left: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.calendar-grid.view-diario .hours-sidebar-right {
+  right: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .calendar-grid.view-diario .hour-label {
   position: absolute;
-  right: 12px;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.4);
   font-family: var(--font-geom);
   transform: translateY(-50%);
 }
 
-/* Área de eventos cuadriculada */
+.calendar-grid.view-diario .hours-sidebar-left .hour-label {
+  left: 12px;
+}
+
+.calendar-grid.view-diario .hours-sidebar-right .hour-label {
+  right: 12px;
+}
+
+/* Área de eventos cuadriculada en el centro */
 .calendar-grid.view-diario .events-wrapper {
   position: relative;
   height: calc(24 * var(--hour-height));
-  margin-right: 70px; /* Espacio para el sidebar de horas a la derecha */
+  margin-left: 70px;  /* Espacio para el sidebar izquierdo */
+  margin-right: 70px; /* Espacio para el sidebar derecho */
+  border-left: 1px solid rgba(255, 255, 255, 0.03);
   border-right: 1px solid rgba(255, 255, 255, 0.03);
   background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 100% var(--hour-height);
@@ -2206,7 +2225,7 @@ dialog[open] {
   height: calc(var(--duration) * var(--hour-height) - 4px);
   left: calc(var(--col-index) * (100% / var(--total-cols)) + 2px);
   width: calc((100% / var(--total-cols)) - 4px);
-  max-width: 280px; /* Ancho máximo de tarjeta chico */
+  /* Eliminado max-width de 280px para aprovechar el ancho completo disponible */
   margin: 0 !important;
   padding: 10px 12px !important;
   gap: 4px !important;
