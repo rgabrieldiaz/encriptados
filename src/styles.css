@@ -2133,7 +2133,7 @@ dialog[open] {
 /* Vista Diaria - Agenda Horaria y Solapamientos */
 .calendar-grid.view-diario {
   grid-template-columns: 1fr;
-  max-width: 800px; /* Agrandar un poco el ancho para permitir solapamientos cómodos */
+  max-width: 450px; /* Contenedor angosto para una agenda diaria estética */
   margin: 0 auto;
   min-height: auto;
 }
@@ -2206,6 +2206,7 @@ dialog[open] {
   height: calc(var(--duration) * var(--hour-height) - 4px);
   left: calc(var(--col-index) * (100% / var(--total-cols)) + 2px);
   width: calc((100% / var(--total-cols)) - 4px);
+  max-width: 280px; /* Ancho máximo de tarjeta chico */
   margin: 0 !important;
   padding: 10px 12px !important;
   gap: 4px !important;
@@ -2244,6 +2245,15 @@ dialog[open] {
 
 .calendar-grid.view-diario .event-card .event-card-meta-row {
   margin-top: auto !important;
+}
+
+/* Ocultar elementos específicos en las tarjetas de la vista diaria (agenda diaria) */
+.calendar-grid.view-diario .event-card .btn-bookmark,
+.calendar-grid.view-diario .event-card .event-card-action,
+.calendar-grid.view-diario .event-card .event-card-date-part,
+.calendar-grid.view-diario .event-card .event-card-host,
+.calendar-grid.view-diario .event-card .event-card-meta-row {
+  display: none !important;
 }
 
 
