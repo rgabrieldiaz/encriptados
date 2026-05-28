@@ -205,7 +205,8 @@ export async function getEvents(city, referenceDate = new Date()) {
           date: e.event_date, // Formato YYYY-MM-DD
           cover_url: e.cover_url,
           host_name: e.host_name,
-          price_info: e.price_info
+          price_info: e.price_info,
+          luma_url: e.luma_url
         }));
         console.log(`Cargados ${dbEvents.length} eventos reales desde Supabase para ${city}.`);
         return dbEvents;

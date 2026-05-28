@@ -1111,10 +1111,11 @@ body {
 
 .modal-actions {
   display: flex;
+  gap: 12px;
+  width: 100%;
 }
 
 .action-btn {
-  width: 100%;
   background: linear-gradient(135deg, var(--neon-purple) 0%, var(--neon-cyan) 100%);
   border: none;
   color: #ffffff;
@@ -1141,6 +1142,85 @@ body {
   width: 16px;
   height: 16px;
   stroke: currentColor;
+}
+
+/* Lu.ma branded orange/red gradient button */
+.modal-actions .luma-btn {
+  flex: 1.5;
+  background: linear-gradient(135deg, #ff4e50 0%, #f9d423 100%);
+  box-shadow: 0 4px 15px rgba(255, 78, 80, 0.25);
+  text-decoration: none;
+}
+
+.modal-actions .luma-btn:hover {
+  box-shadow: 0 6px 20px rgba(255, 78, 80, 0.45);
+}
+
+/* Smaller, secondary calendar add button in modal */
+.modal-actions #modal-add-btn {
+  flex: 1.2;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.8);
+  box-shadow: none;
+  padding: 12px 16px;
+}
+
+.modal-actions #modal-add-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.modal-actions #modal-add-btn.added {
+  background: linear-gradient(135deg, rgba(0, 255, 135, 0.15) 0%, rgba(96, 239, 255, 0.15) 100%);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+}
+
+/* Suggest Confirmation Details Table */
+.suggest-confirm-details {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggest-confirm-details .detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 10px;
+}
+
+.suggest-confirm-details .detail-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.suggest-confirm-details .detail-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 600;
+  font-family: var(--font-geom);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-top: 2px;
+}
+
+.suggest-confirm-details .detail-value {
+  color: rgba(255, 255, 255, 0.95);
+  text-align: right;
+  word-break: break-word;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 /* ==========================================================================
@@ -1736,30 +1816,7 @@ dialog[open] {
   text-shadow: 0 0 5px rgba(138, 43, 226, 0.4);
 }
 
-.preview-card-viewport {
-  perspective: 1000px;
-  display: flex;
-  justify-content: center;
-  margin-bottom: 24px;
-}
 
-.preview-card {
-  width: 100% !important;
-  max-width: 320px;
-  margin: 0 auto;
-  pointer-events: none;
-  transform: rotateX(8deg) rotateY(-4deg) translateZ(20px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 255, 255, 0.15) !important;
-}
-
-.preview-location-detail {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-top: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 .btn-confirm-save {
   width: 100%;

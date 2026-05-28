@@ -110,12 +110,14 @@ const dom = {
   suggestLoader: document.getElementById('suggest-loader'),
   suggestError: document.getElementById('suggest-error'),
   previewArea: document.getElementById('preview-area'),
-  previewCard: document.getElementById('preview-card'),
-  previewIndicator: document.getElementById('preview-indicator'),
-  previewTags: document.getElementById('preview-tags'),
-  previewCardTitle: document.getElementById('preview-card-title'),
-  previewCardTime: document.getElementById('preview-card-time'),
-  btnConfirmSave: document.getElementById('btn-confirm-save')
+  btnConfirmSave: document.getElementById('btn-confirm-save'),
+  modalLumaLink: document.getElementById('modal-luma-link'),
+  confirmTitle: document.getElementById('confirm-title'),
+  confirmHost: document.getElementById('confirm-host'),
+  confirmTime: document.getElementById('confirm-time'),
+  confirmPrice: document.getElementById('confirm-price'),
+  confirmType: document.getElementById('confirm-type'),
+  confirmLocation: document.getElementById('confirm-location')
 };
 
 // ==========================================================================
@@ -990,9 +992,13 @@ function syncAllButtonsForEvent(eventId) {
  */
 function updateButtonVisualState(buttonElement, isAdded) {
   if (!buttonElement) return;
+  const isModalBtn = buttonElement.id === 'modal-add-btn';
+  const textAdd = isModalBtn ? 'Añadir' : 'Añadir al calendario';
+  const textAdded = isModalBtn ? 'Guardado' : 'En mi calendario';
+
   if (isAdded) {
     buttonElement.innerHTML = `
-      <span>En mi calendario</span>
+      <span>${textAdded}</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
         <polyline points="20 6 9 17 4 12" />
       </svg>
@@ -1000,7 +1006,7 @@ function updateButtonVisualState(buttonElement, isAdded) {
     buttonElement.classList.add('added');
   } else {
     buttonElement.innerHTML = `
-      <span>Añadir al calendario</span>
+      <span>${textAdd}</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
         <line x1="16" y1="2" x2="16" y2="6" />
@@ -1273,6 +1279,17 @@ let currentActiveModalEventId = null;
 function openEventModal(event) {
   currentActiveModalEventId = event.id;
   
+  // Configurar enlace de Lu.ma
+  if (dom.modalLumaLink) {
+    if (event.luma_url) {
+      dom.modalLumaLink.href = event.luma_url;
+      dom.modalLumaLink.classList.remove('hidden');
+    } else {
+      dom.modalLumaLink.href = '#';
+      dom.modalLumaLink.classList.add('hidden');
+    }
+  }
+  
   // Renderizar Flyer
   const coverContainer = document.getElementById('modal-cover-container');
   const coverImg = document.getElementById('modal-cover-img');
@@ -1543,82 +1560,36 @@ function resetSuggestModal() {
 }
 
 function renderSuggestPreviewCard(event) {
-  if (!dom.previewCard) return;
-
-  // Miniatura / Flyer
-  const previewThumbImg = dom.previewCard.querySelector('.event-card-thumb img');
-  if (previewThumbImg) {
-    previewThumbImg.src = event.cover_url || 'src/assets/event-placeholder.png';
-  }
-
-  // Actualizar indicador circular (presencial / virtual)
-  const indicator = dom.previewIndicator;
-  if (indicator) {
-    indicator.className = `event-badge-indicator ${event.location_type}`;
-    if (event.location_type === 'presencial') {
-      indicator.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-          <circle cx="12" cy="10" r="3" />
-        </svg>
-      `;
-      indicator.title = 'Presencial';
-    } else {
-      indicator.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M23 7l-7 5 7 5V7z" />
-          <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-        </svg>
-      `;
-      indicator.title = 'Virtual';
-    }
-  }
-
   // Título
-  dom.previewCardTitle.textContent = event.title;
+  if (dom.confirmTitle) dom.confirmTitle.textContent = event.title;
 
-  // Host y Precio
-  const previewHostPrice = document.getElementById('preview-host-price');
-  const previewHost = document.getElementById('preview-host');
-  const previewPrice = document.getElementById('preview-price');
-  if (previewHostPrice && previewHost && previewPrice) {
-    if (event.host_name || event.price_info) {
-      if (event.host_name) {
-        previewHost.textContent = `Host: ${event.host_name}`;
-        previewHost.classList.remove('hidden');
-      } else {
-        previewHost.classList.add('hidden');
-      }
-      if (event.price_info) {
-        previewPrice.textContent = event.price_info;
-        const isFree = event.price_info.toLowerCase().includes('gratis') || event.price_info.toLowerCase().includes('free');
-        previewPrice.className = `event-card-price ${isFree ? 'price-free' : 'price-paid'}`;
-        previewPrice.classList.remove('hidden');
-      } else {
-        previewPrice.classList.add('hidden');
-      }
-      previewHostPrice.classList.remove('hidden');
-    } else {
-      previewHostPrice.classList.add('hidden');
-    }
+  // Organizador
+  if (dom.confirmHost) dom.confirmHost.textContent = event.host_name || 'No especificado';
+
+  // Precio
+  if (dom.confirmPrice) {
+    dom.confirmPrice.textContent = event.price_info || 'Gratis';
+    const isFree = (event.price_info || 'Gratis').toLowerCase().includes('gratis') || (event.price_info || '').toLowerCase().includes('free');
+    dom.confirmPrice.className = `detail-value event-card-price ${isFree ? 'price-free' : 'price-paid'}`;
   }
 
-  // Tiempo
-  const parts = event.event_date.split('-');
-  const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-  const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
-  const formattedMonth = months[dateObj.getMonth()];
-  const formattedDate = `${dateObj.getDate()} ${formattedMonth} ${dateObj.getFullYear()}`;
-  dom.previewCardTime.textContent = `${formattedDate} - ${event.time_range}`;
+  // Modalidad
+  if (dom.confirmType) {
+    dom.confirmType.textContent = event.location_type === 'presencial' ? 'Presencial 📍' : 'Virtual 💻';
+  }
 
-  // Tags
-  dom.previewTags.innerHTML = '';
-  event.tags.forEach(tag => {
-    const span = document.createElement('span');
-    span.className = `event-tag tag-${tag.toLowerCase()}`;
-    span.textContent = `#${tag}`;
-    dom.previewTags.appendChild(span);
-  });
+  // Ubicación
+  if (dom.confirmLocation) dom.confirmLocation.textContent = event.location_detail || 'Virtual';
+
+  // Fecha y Hora
+  if (dom.confirmTime) {
+    const parts = event.event_date.split('-');
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    const months = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+    const formattedMonth = months[dateObj.getMonth()];
+    const formattedDate = `${dateObj.getDate()} ${formattedMonth} ${dateObj.getFullYear()}`;
+    dom.confirmTime.textContent = `${formattedDate} - ${event.time_range} hs`;
+  }
 }
 
 // ==========================================================================
