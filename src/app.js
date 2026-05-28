@@ -1396,11 +1396,14 @@ function initSuggestModal() {
       });
 
       if (error) {
-        // Intentar parsear el JSON de error si existe
         let errorMsg = "Error al analizar el evento con IA.";
         try {
-          const bodyErr = JSON.parse(error.message);
-          errorMsg = bodyErr.error || errorMsg;
+          if (error.context && typeof error.context.json === 'function') {
+            const bodyErr = await error.context.json();
+            errorMsg = bodyErr.error || bodyErr.message || errorMsg;
+          } else {
+            errorMsg = error.message || errorMsg;
+          }
         } catch {
           errorMsg = error.message || errorMsg;
         }
