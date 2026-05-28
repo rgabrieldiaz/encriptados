@@ -29,6 +29,9 @@
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   --transition-slow: 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Altura de hora para la vista diaria */
+  --hour-height: 100px;
 }
 
 /* ==========================================================================
@@ -2120,6 +2123,127 @@ dialog[open] {
 .view-semanal .event-card .event-card-host-price,
 .view-semanal .event-card .event-card-meta-row {
   display: none !important;
+}
+
+/* Ocultar sidebar de horas por defecto */
+.hours-sidebar {
+  display: none !important;
+}
+
+/* Vista Diaria - Agenda Horaria y Solapamientos */
+.calendar-grid.view-diario {
+  grid-template-columns: 1fr;
+  max-width: 800px; /* Agrandar un poco el ancho para permitir solapamientos cómodos */
+  margin: 0 auto;
+  min-height: auto;
+}
+
+.calendar-grid.view-diario .calendar-column {
+  display: none;
+  background: rgba(14, 14, 25, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  padding: 16px 16px 16px 8px !important;
+  border-radius: 14px;
+  max-height: 600px;
+  overflow-y: auto;
+  position: relative;
+  /* Scrollbar personalizado para el scroll de horas */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.calendar-grid.view-diario .calendar-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-grid.view-diario .calendar-column::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.calendar-grid.view-diario .calendar-column.active-day-col {
+  display: flex !important;
+  flex-direction: column;
+  animation: fadeInDay 0.4s ease-out;
+}
+
+/* Sidebar de horas a la derecha */
+.calendar-grid.view-diario .hours-sidebar {
+  display: block !important;
+  position: absolute;
+  right: 0;
+  top: 16px; /* Alinear con el padding superior de la columna */
+  width: 70px;
+  height: calc(24 * var(--hour-height));
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.calendar-grid.view-diario .hour-label {
+  position: absolute;
+  right: 12px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-geom);
+  transform: translateY(-50%);
+}
+
+/* Área de eventos cuadriculada */
+.calendar-grid.view-diario .events-wrapper {
+  position: relative;
+  height: calc(24 * var(--hour-height));
+  margin-right: 70px; /* Espacio para el sidebar de horas a la derecha */
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% var(--hour-height);
+}
+
+/* Posicionamiento absoluto de tarjetas según horario y carril de solapamiento */
+.calendar-grid.view-diario .event-card {
+  position: absolute;
+  top: calc(var(--start-hour) * var(--hour-height) + 2px);
+  height: calc(var(--duration) * var(--hour-height) - 4px);
+  left: calc(var(--col-index) * (100% / var(--total-cols)) + 2px);
+  width: calc((100% / var(--total-cols)) - 4px);
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  gap: 4px !important;
+  overflow: hidden;
+  z-index: 5;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), z-index 0.1s;
+}
+
+/* Resaltado de tarjetas en hover para solapamientos */
+.calendar-grid.view-diario .event-card:hover {
+  z-index: 10 !important;
+  transform: scale(1.02) translateZ(10px) !important;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.8), 0 0 15px rgba(0, 255, 255, 0.3) !important;
+}
+
+/* Ocultar la miniatura (cover image) en vista diaria para ganar espacio */
+.calendar-grid.view-diario .event-card .event-card-thumb {
+  display: none !important;
+}
+
+/* Estilos compactos para texto en tarjetas de vista diaria */
+.calendar-grid.view-diario .event-card .event-card-title {
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+  margin-bottom: 2px !important;
+}
+
+.calendar-grid.view-diario .event-card .event-card-time {
+  font-size: 9px !important;
+}
+
+.calendar-grid.view-diario .event-card .event-card-host-price {
+  font-size: 9px !important;
+  margin-top: 0 !important;
+}
+
+.calendar-grid.view-diario .event-card .event-card-meta-row {
+  margin-top: auto !important;
 }
 
 

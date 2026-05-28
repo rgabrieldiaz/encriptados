@@ -322,6 +322,121 @@ async function loadEventsByCity(city) {
 }
 
 /**
+ * Parsea un rango de hora en formato "HH:MM - HH:MM" a valores decimales.
+ */
+function parseTimeRange(timeStr) {
+  if (!timeStr) return { start: 9, end: 11 };
+  const parts = timeStr.split('-');
+  if (parts.length < 2) return { start: 9, end: 11 };
+  
+  const parseTime = (s) => {
+    const [hStr, mStr] = s.trim().split(':');
+    const h = parseInt(hStr, 10) || 0;
+    const m = parseInt(mStr, 10) || 0;
+    return h + m / 60;
+  };
+  
+  let start = parseTime(parts[0]);
+  let end = parseTime(parts[1]);
+  if (end < start) {
+    end = end + 24; // Evento pasa de la medianoche
+  }
+  
+  // Limitar rangos válidos
+  start = Math.max(0, Math.min(24, start));
+  end = Math.max(start + 0.5, Math.min(24, end)); // Mínimo 30 minutos
+  return { start, end };
+}
+
+/**
+ * Agrupa los eventos que se solapan y les asigna carriles (columnas) para colocarlos lado a lado.
+ */
+function layoutDayEvents(dayEvents) {
+  const eventsWithTimes = dayEvents.map(event => {
+    const times = parseTimeRange(event.time);
+    return {
+      event,
+      start: times.start,
+      end: times.end,
+      duration: times.end - times.start
+    };
+  });
+  
+  // Ordenar por hora de inicio, luego por duración descendente
+  eventsWithTimes.sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    return b.duration - a.duration;
+  });
+  
+  // Agrupar en clusters de solapamiento
+  const clusters = [];
+  eventsWithTimes.forEach(item => {
+    let placedInCluster = false;
+    for (const cluster of clusters) {
+      const overlaps = cluster.some(cItem => {
+        return item.start < cItem.end && item.end > cItem.start;
+      });
+      if (overlaps) {
+        cluster.push(item);
+        placedInCluster = true;
+        break;
+      }
+    }
+    if (!placedInCluster) {
+      clusters.push([item]);
+    }
+  });
+  
+  // Para cada cluster, asignar columnas
+  clusters.forEach(cluster => {
+    const columns = [];
+    cluster.forEach(item => {
+      let colIndex = 0;
+      while (true) {
+        const overlaps = (columns[colIndex] || []).some(placedItem => {
+          return item.start < placedItem.end && item.end > placedItem.start;
+        });
+        if (!overlaps) {
+          if (!columns[colIndex]) {
+            columns[colIndex] = [];
+          }
+          columns[colIndex].push(item);
+          item.colIndex = colIndex;
+          break;
+        }
+        colIndex++;
+      }
+    });
+    
+    const totalCols = columns.length;
+    cluster.forEach(item => {
+      item.totalCols = totalCols;
+    });
+  });
+  
+  return eventsWithTimes;
+}
+
+/**
+ * Asegura que exista el sidebar de horas dentro de la columna diaria.
+ */
+function ensureHoursSidebar(column) {
+  let sidebar = column.querySelector('.hours-sidebar');
+  if (!sidebar) {
+    sidebar = document.createElement('div');
+    sidebar.className = 'hours-sidebar';
+    for (let h = 0; h < 24; h++) {
+      const hourLabel = document.createElement('div');
+      hourLabel.className = 'hour-label';
+      hourLabel.style.top = `calc(${h} * var(--hour-height))`;
+      hourLabel.textContent = `${String(h).padStart(2, '0')}:00`;
+      sidebar.appendChild(hourLabel);
+    }
+    column.appendChild(sidebar);
+  }
+}
+
+/**
  * Renderiza los eventos en sus columnas correspondientes.
  */
 function renderEvents() {
@@ -349,7 +464,11 @@ function renderEvents() {
     }
   });
 
-  // 2. Insertar las tarjetas en la columna correcta de la semana seleccionada
+  // Agrupar eventos activos de la semana por día de la semana
+  const eventsByDay = {
+    MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: []
+  };
+
   state.events.forEach(event => {
     const day = event.dayOfWeek;
     const colDate = weekDates[day];
@@ -361,17 +480,37 @@ function renderEvents() {
     const dd = String(colDate.getDate()).padStart(2, '0');
     const colDateStr = `${yyyy}-${mm}-${dd}`;
 
-    // Si la fecha del evento no coincide con el día real de la columna para esta semana, no se dibuja
-    if (event.date !== colDateStr) return;
+    // Si la fecha del evento coincide con el día real de la columna para esta semana
+    if (event.date === colDateStr) {
+      eventsByDay[day].push(event);
+    }
+  });
 
+  // Renderizar cada columna
+  daysOrder.forEach(day => {
     const column = Array.from(dom.columns).find(col => col.getAttribute('data-day') === day);
     if (!column) return;
 
-    column.classList.add('has-events');
     const wrapper = column.querySelector('.events-wrapper');
+    const dayEvents = eventsByDay[day];
 
-    const card = createEventCard(event);
-    wrapper.appendChild(card);
+    if (dayEvents.length > 0) {
+      column.classList.add('has-events');
+      ensureHoursSidebar(column);
+
+      const positionedEvents = layoutDayEvents(dayEvents);
+      positionedEvents.forEach(item => {
+        const card = createEventCard(item.event);
+        
+        // Inyectar variables de posicionamiento CSS
+        card.style.setProperty('--start-hour', item.start);
+        card.style.setProperty('--duration', item.duration);
+        card.style.setProperty('--col-index', item.colIndex);
+        card.style.setProperty('--total-cols', item.totalCols);
+
+        wrapper.appendChild(card);
+      });
+    }
   });
 
   // Ajustar inclinación individual de tarjetas en 3D
@@ -674,6 +813,33 @@ function updateActiveDayColumn() {
     const day = col.getAttribute('data-day');
     if (day === state.activeDay) {
       col.classList.add('active-day-col');
+      
+      // Auto-scroll al primer evento del día si estamos en vista diaria
+      if (state.currentView === 'diario') {
+        const cards = col.querySelectorAll('.event-card');
+        if (cards.length > 0) {
+          let minStartHour = 24;
+          cards.forEach(card => {
+            const startHour = parseFloat(card.style.getPropertyValue('--start-hour'));
+            if (!isNaN(startHour) && startHour < minStartHour) {
+              minStartHour = startHour;
+            }
+          });
+          
+          if (minStartHour < 24) {
+            const hourHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--hour-height')) || 75;
+            // Scroll a 1 hora antes del primer evento
+            const scrollTarget = Math.max(0, (minStartHour - 1) * hourHeight);
+            setTimeout(() => {
+              col.scrollTop = scrollTarget;
+            }, 50);
+          }
+        } else {
+          setTimeout(() => {
+            col.scrollTop = 0;
+          }, 50);
+        }
+      }
     } else {
       col.classList.remove('active-day-col');
     }
