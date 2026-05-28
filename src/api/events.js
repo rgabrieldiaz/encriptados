@@ -255,25 +255,7 @@ export async function getEvents(city, referenceDate = new Date()) {
  * Simula la detección de ubicación del usuario basada en IP.
  */
 export async function detectUserLocation() {
-  try {
-    const res = await fetch("https://ipapi.co/json/");
-    if (res.ok) {
-      const data = await res.json();
-      // Mapear país/ciudad a las opciones soportadas
-      const country = data.country_code; // AR, CO, CL, etc.
-      const city = data.city;
-      
-      if (country === 'CO' || city === 'Bogota' || city === 'Bogotá') {
-        return { city: "Bogotá", cityName: "Bogotá, Colombia" };
-      } else if (country === 'CL' || city === 'Santiago') {
-        return { city: "Santiago", cityName: "Santiago, Chile" };
-      }
-    }
-  } catch (e) {
-    console.warn("Error al autodetectar IP:", e.message);
-  }
-  
-  // Default fallback
+  // Por ahora solo detectamos Buenos Aires (AMBA) ya que otras ciudades aún no están disponibles
   return {
     city: "AMBA",
     cityName: "Buenos Aires (AMBA)"

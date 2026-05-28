@@ -347,7 +347,7 @@ body {
   transition: all var(--transition-fast);
 }
 
-.location-dropdown li:hover {
+.location-dropdown li:not(.disabled):hover {
   background: rgba(138, 43, 226, 0.15);
   color: #ffffff;
   padding-left: 20px;
@@ -357,6 +357,20 @@ body {
   color: var(--neon-cyan);
   background: rgba(0, 255, 255, 0.05);
   border-left: 3px solid var(--neon-cyan);
+}
+
+.location-dropdown li.disabled {
+  color: rgba(255, 255, 255, 0.25) !important;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.location-dropdown li .not-available {
+  display: block;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+  margin-top: 2px;
 }
 
 .location-dropdown li .flag {

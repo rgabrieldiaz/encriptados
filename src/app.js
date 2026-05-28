@@ -1595,6 +1595,8 @@ function initLocationDropdown() {
     item.addEventListener('click', (e) => {
       e.stopPropagation();
       
+      if (item.classList.contains('disabled')) return;
+      
       const city = item.getAttribute('data-city');
       const cityName = item.querySelector('span').textContent;
 
