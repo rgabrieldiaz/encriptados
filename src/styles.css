@@ -1035,17 +1035,54 @@ body {
 .footer-info {
   transform: translateZ(10px);
   text-align: center;
-  padding: 8px 0;
-  margin-top: 10px;
+  padding: 16px 0;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.footer-info p {
+.footer-info .footer-moto {
   font-family: var(--font-geom);
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 2px;
   color: rgba(255, 255, 255, 0.25);
   text-shadow: 0 0 3px rgba(138, 43, 226, 0.1);
+  margin: 0;
+}
+
+.footer-info .footer-author {
+  font-family: var(--font-geom);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.45);
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+  margin: 0;
+}
+
+.footer-info .cafecito-btn-container {
+  margin-top: 4px;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  display: inline-flex;
+}
+
+.footer-info .cafecito-btn-container img {
+  height: 32px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.2s ease;
+}
+
+.footer-info .cafecito-btn-container:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+.footer-info .cafecito-btn-container img:hover {
+  box-shadow: 0 0 15px rgba(138, 43, 226, 0.5);
 }
 
 /* ==========================================================================
