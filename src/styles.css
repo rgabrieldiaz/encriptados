@@ -2239,7 +2239,7 @@ dialog[open] {
   height: calc(var(--duration) * var(--hour-height) - 4px);
   left: calc(var(--col-index) * (100% / var(--total-cols)) + 2px);
   width: calc((100% / var(--total-cols)) - 4px);
-  max-width: 280px; /* Ancho máximo estilizado para mantener las tarjetas compactas */
+  max-width: 220px; /* Ancho máximo ultra compacto y esbelto */
   margin: 0 !important;
   padding: 10px 12px !important;
   gap: 4px !important;
