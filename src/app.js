@@ -1,4 +1,4 @@
-import { getEvents, detectUserLocation, supabase } from './api/events.js';
+import { getEvents, detectUserLocation, bulkSuggestEvents, runAgents, getMonitoredSources, addMonitoredSource, deleteMonitoredSource, getAgentRuns, supabase } from './api/events.js';
 
 // ==========================================================================
 // ESTADO GLOBAL DE LA APLICACIÓN
@@ -141,7 +141,35 @@ const dom = {
   userProfile: document.getElementById('user-profile'),
   userEmailDisplay: document.getElementById('user-email-display'),
   btnLogout: document.getElementById('btn-logout'),
-  modalShareBtn: document.getElementById('modal-share-btn')
+  modalShareBtn: document.getElementById('modal-share-btn'),
+
+  // Selectores para Procesamiento Masivo (Bulk Suggest)
+  suggestTabs: document.getElementById('suggest-tabs'),
+  tabIndividualBtn: document.getElementById('tab-individual-btn'),
+  tabBulkBtn: document.getElementById('tab-bulk-btn'),
+  suggestIndividualContent: document.getElementById('suggest-individual-content'),
+  suggestBulkContent: document.getElementById('suggest-bulk-content'),
+  suggestBulkForm: document.getElementById('suggest-bulk-form'),
+  suggestBulkInput: document.getElementById('suggest-bulk-input'),
+  btnSuggestBulkSubmit: document.getElementById('btn-suggest-bulk-submit'),
+  btnImportFileTrigger: document.getElementById('btn-import-file-trigger'),
+  suggestFileInput: document.getElementById('suggest-file-input'),
+  bulkResultsArea: document.getElementById('bulk-results-area'),
+  bulkResultsList: document.getElementById('bulk-results-list'),
+  btnBulkResultsClose: document.getElementById('btn-bulk-results-close'),
+  suggestLoaderText: document.getElementById('suggest-loader-text'),
+
+  // Selectores para Agentes Autónomos
+  tabAgentsBtn: document.getElementById('tab-agents-btn'),
+  suggestAgentsContent: document.getElementById('suggest-agents-content'),
+  addSourceForm: document.getElementById('add-source-form'),
+  sourceTypeSelect: document.getElementById('source-type-select'),
+  sourceCitySelect: document.getElementById('source-city-select'),
+  sourceInput: document.getElementById('source-input'),
+  sourcesList: document.getElementById('sources-list'),
+  btnDeployAgents: document.getElementById('btn-deploy-agents'),
+  agentsConsole: document.getElementById('agents-console'),
+  runsHistoryList: document.getElementById('runs-history-list')
 };
 
 // ==========================================================================
@@ -1946,6 +1974,8 @@ function initSuggestModal() {
   dom.btnSuggestTrigger.addEventListener('click', () => {
     dom.suggestModal.showModal();
     resetSuggestModal();
+    // Default to individual tab
+    if (dom.tabIndividualBtn) dom.tabIndividualBtn.click();
   });
 
   // Cerrar al clickear botón de cerrar
@@ -1972,6 +2002,41 @@ function initSuggestModal() {
     });
   }
 
+  // Controlador de Pestañas (Tabs)
+  if (dom.tabIndividualBtn && dom.tabBulkBtn && dom.tabAgentsBtn) {
+    dom.tabIndividualBtn.addEventListener('click', () => {
+      dom.tabIndividualBtn.classList.add('active');
+      dom.tabBulkBtn.classList.remove('active');
+      dom.tabAgentsBtn.classList.remove('active');
+      dom.suggestIndividualContent.classList.remove('hidden');
+      dom.suggestBulkContent.classList.add('hidden');
+      dom.suggestAgentsContent.classList.add('hidden');
+      resetSuggestModal();
+    });
+
+    dom.tabBulkBtn.addEventListener('click', () => {
+      dom.tabBulkBtn.classList.add('active');
+      dom.tabIndividualBtn.classList.remove('active');
+      dom.tabAgentsBtn.classList.remove('active');
+      dom.suggestBulkContent.classList.remove('hidden');
+      dom.suggestIndividualContent.classList.add('hidden');
+      dom.suggestAgentsContent.classList.add('hidden');
+      resetSuggestModal();
+    });
+
+    dom.tabAgentsBtn.addEventListener('click', () => {
+      dom.tabAgentsBtn.classList.add('active');
+      dom.tabIndividualBtn.classList.remove('active');
+      dom.tabBulkBtn.classList.remove('active');
+      dom.suggestAgentsContent.classList.remove('hidden');
+      dom.suggestIndividualContent.classList.add('hidden');
+      dom.suggestBulkContent.classList.add('hidden');
+      resetSuggestModal();
+      loadAgentsTabContent();
+    });
+  }
+
+  // Sugerencia Individual: Submit
   dom.suggestForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     let url = dom.suggestUrlInput.value.trim();
@@ -1984,6 +2049,7 @@ function initSuggestModal() {
     // Resetear estados visuales
     dom.suggestError.classList.add('hidden');
     dom.previewArea.classList.add('hidden');
+    if (dom.suggestLoaderText) dom.suggestLoaderText.textContent = "Analizando y enriqueciendo el evento con IA...";
     dom.suggestLoader.classList.remove('hidden');
     dom.suggestForm.classList.add('hidden'); // Ocultar input durante carga
 
@@ -2103,16 +2169,739 @@ function initSuggestModal() {
       dom.btnConfirmSave.disabled = false;
     }
   });
+
+  // Sugerencia por Lote: Submit
+  if (dom.suggestBulkForm) {
+    dom.suggestBulkForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const rawText = dom.suggestBulkInput.value || '';
+      const lines = rawText.split('\n');
+      const cleanedUrls = [];
+      
+      for (let line of lines) {
+        line = line.trim();
+        if (!line) continue;
+        const cleanUrl = line.split('?')[0].split('#')[0].trim();
+        if (!cleanUrl) continue;
+        
+        try {
+          const urlObj = new URL(cleanUrl);
+          if (urlObj.hostname.includes('lu.ma') || urlObj.hostname.includes('luma.com')) {
+            cleanedUrls.push(cleanUrl);
+          } else {
+            console.warn(`URL ignorada (no es de Lu.ma): ${cleanUrl}`);
+          }
+        } catch {
+          try {
+            const urlObj = new URL(`https://${cleanUrl}`);
+            if (urlObj.hostname.includes('lu.ma') || urlObj.hostname.includes('luma.com')) {
+              cleanedUrls.push(`https://${cleanUrl}`);
+            }
+          } catch {
+            console.warn(`URL inválida ignorada: ${cleanUrl}`);
+          }
+        }
+      }
+
+      if (cleanedUrls.length === 0) {
+        dom.suggestError.textContent = "Por favor, ingresa al menos una URL válida de Lu.ma";
+        dom.suggestError.classList.remove('hidden');
+        return;
+      }
+
+      // Ocultar formulario, mostrar loader masivo
+      dom.suggestError.classList.add('hidden');
+      dom.bulkResultsArea.classList.add('hidden');
+      if (dom.suggestLoaderText) {
+        dom.suggestLoaderText.textContent = `Procesando ${cleanedUrls.length} eventos en paralelo...`;
+      }
+      dom.suggestLoader.classList.remove('hidden');
+      dom.suggestBulkForm.classList.add('hidden');
+
+      try {
+        const response = await bulkSuggestEvents(cleanedUrls);
+        const results = response.results || [];
+
+        // Limpiar y renderizar reporte
+        dom.bulkResultsList.innerHTML = '';
+        let successCount = 0;
+
+        results.forEach(item => {
+          const isSuccess = item.status === 'success';
+          if (isSuccess) successCount++;
+
+          const itemEl = document.createElement('div');
+          itemEl.className = `bulk-result-item ${isSuccess ? 'status-success' : 'status-error'}`;
+
+          const infoEl = document.createElement('div');
+          infoEl.className = 'event-info';
+
+          const titleEl = document.createElement('span');
+          titleEl.className = 'event-title';
+          titleEl.textContent = isSuccess ? (item.title || 'Evento sugerido') : (item.message || item.error || 'Error al procesar');
+
+          const urlEl = document.createElement('span');
+          urlEl.className = 'event-url';
+          urlEl.textContent = item.url;
+
+          infoEl.appendChild(titleEl);
+          infoEl.appendChild(urlEl);
+
+          const badgeEl = document.createElement('div');
+          badgeEl.className = 'status-badge';
+          badgeEl.textContent = isSuccess ? 'GUARDADO ✓' : 'ERROR ✗';
+
+          itemEl.appendChild(infoEl);
+          itemEl.appendChild(badgeEl);
+
+          dom.bulkResultsList.appendChild(itemEl);
+        });
+
+        dom.bulkResultsArea.classList.remove('hidden');
+
+        if (successCount > 0) {
+          showToast("IMPORTACIÓN COMPLETADA", `Se procesaron correctamente ${successCount} de ${cleanedUrls.length} eventos.`, "success");
+          await loadEventsForCurrentWeek();
+        } else {
+          showToast("IMPORTACIÓN COMPLETADA", `Ningún evento pudo ser importado de la lista.`, "warning");
+        }
+      } catch (err) {
+        console.error(err);
+        dom.suggestError.textContent = err.message || "Ocurrió un error al procesar el lote.";
+        dom.suggestError.classList.remove('hidden');
+        dom.suggestBulkForm.classList.remove('hidden');
+      } finally {
+        dom.suggestLoader.classList.add('hidden');
+      }
+    });
+  }
+
+  // Carga mediante Archivo CSV / JSON
+  if (dom.btnImportFileTrigger && dom.suggestFileInput) {
+    dom.btnImportFileTrigger.addEventListener('click', () => {
+      dom.suggestFileInput.click();
+    });
+
+    dom.suggestFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        const content = evt.target.result;
+        try {
+          let items = [];
+          if (file.name.endsWith('.json')) {
+            let parsedData;
+            try {
+              parsedData = JSON.parse(content);
+            } catch {
+              throw new Error("El archivo JSON no tiene un formato válido.");
+            }
+            const rawItems = Array.isArray(parsedData) ? parsedData : [parsedData];
+            items = mapJSONItems(rawItems);
+          } else if (file.name.endsWith('.csv')) {
+            const parsedLines = parseCSV(content);
+            if (parsedLines.length < 2) {
+              throw new Error("El archivo CSV debe contener una fila de cabecera y al menos una fila de datos.");
+            }
+            items = mapCSVItems(parsedLines);
+          } else {
+            throw new Error("Formato de archivo no soportado. Debe ser .csv o .json");
+          }
+
+          if (items.length === 0) {
+            throw new Error("No se encontraron registros de eventos válidos en el archivo.");
+          }
+
+          const validItems = [];
+          const results = [];
+
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const rowNum = i + 1;
+            if (!item.title) {
+              results.push({
+                title: `Fila ${rowNum}: Sin título`,
+                url: item.luma_url || 'N/A',
+                status: 'error',
+                message: 'Falta el título del evento.'
+              });
+              continue;
+            }
+            if (!item.event_date) {
+              results.push({
+                title: item.title,
+                url: item.luma_url || 'N/A',
+                status: 'error',
+                message: 'Falta la fecha del evento (event_date).'
+              });
+              continue;
+            }
+
+            // Aplicar valores predeterminados
+            if (!item.location_type) item.location_type = 'presencial';
+            if (!item.location_city) item.location_city = 'AMBA';
+            if (!item.time_range) item.time_range = '19:00 - 21:00';
+            if (!item.tags) item.tags = [];
+            if (!item.price_info) item.price_info = 'Gratis';
+
+            // Autodetectar día de la semana si falta
+            if (!item.day_of_week) {
+              const parts = item.event_date.split('-');
+              if (parts.length === 3) {
+                const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                item.day_of_week = days[dateObj.getDay()];
+              } else {
+                item.day_of_week = 'MON';
+              }
+            }
+
+            validItems.push(item);
+          }
+
+          // Resetear estados visuales y mostrar carga
+          dom.suggestError.classList.add('hidden');
+          dom.bulkResultsArea.classList.add('hidden');
+          if (dom.suggestLoaderText) {
+            dom.suggestLoaderText.textContent = `Guardando ${validItems.length} eventos del archivo...`;
+          }
+          dom.suggestLoader.classList.remove('hidden');
+          dom.suggestBulkForm.classList.add('hidden');
+
+          if (validItems.length > 0) {
+            const { error: dbError } = await supabase
+              .from('events')
+              .upsert(validItems, { onConflict: 'luma_url' });
+
+            if (dbError) {
+              throw dbError;
+            }
+
+            validItems.forEach(item => {
+              results.push({
+                title: item.title,
+                url: item.luma_url || 'N/A',
+                status: 'success'
+              });
+            });
+          }
+
+          // Renderizar reporte de resultados
+          dom.bulkResultsList.innerHTML = '';
+          let successCount = 0;
+
+          results.forEach(item => {
+            const isSuccess = item.status === 'success';
+            if (isSuccess) successCount++;
+
+            const itemEl = document.createElement('div');
+            itemEl.className = `bulk-result-item ${isSuccess ? 'status-success' : 'status-error'}`;
+
+            const infoEl = document.createElement('div');
+            infoEl.className = 'event-info';
+
+            const titleEl = document.createElement('span');
+            titleEl.className = 'event-title';
+            titleEl.textContent = isSuccess ? item.title : (item.message || 'Error al guardar');
+
+            const urlEl = document.createElement('span');
+            urlEl.className = 'event-url';
+            urlEl.textContent = item.url;
+
+            infoEl.appendChild(titleEl);
+            infoEl.appendChild(urlEl);
+
+            const badgeEl = document.createElement('div');
+            badgeEl.className = 'status-badge';
+            badgeEl.textContent = isSuccess ? 'GUARDADO ✓' : 'ERROR ✗';
+
+            itemEl.appendChild(infoEl);
+            itemEl.appendChild(badgeEl);
+
+            dom.bulkResultsList.appendChild(itemEl);
+          });
+
+          dom.bulkResultsArea.classList.remove('hidden');
+
+          if (successCount > 0) {
+            showToast("ARCHIVO IMPORTADO", `Se importaron correctamente ${successCount} eventos.`, "success");
+            await loadEventsForCurrentWeek();
+          } else {
+            showToast("IMPORTACIÓN FALLIDA", `Ningún evento pudo ser importado del archivo.`, "danger");
+          }
+
+        } catch (err) {
+          console.error(err);
+          dom.suggestError.textContent = err.message || "Error procesando el archivo de importación.";
+          dom.suggestError.classList.remove('hidden');
+          dom.suggestBulkForm.classList.remove('hidden');
+        } finally {
+          dom.suggestLoader.classList.add('hidden');
+          dom.suggestFileInput.value = ''; // Resetear input
+        }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // Botón de finalización en reporte de resultados
+  if (dom.btnBulkResultsClose) {
+    dom.btnBulkResultsClose.addEventListener('click', () => {
+      dom.suggestModal.close();
+      resetSuggestModal();
+    });
+  }
+
+  // Agregar nueva fuente monitoreada
+  if (dom.addSourceForm) {
+    dom.addSourceForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const type = dom.sourceTypeSelect.value;
+      const city = dom.sourceCitySelect.value;
+      const inputVal = dom.sourceInput.value.trim();
+
+      if (!inputVal) return;
+
+      const btnSubmit = dom.addSourceForm.querySelector('button[type="submit"]');
+      const originalText = btnSubmit.innerHTML;
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '<span>Añadiendo...</span>';
+
+      try {
+        await addMonitoredSource(type, inputVal, city);
+        showToast("FUENTE AGREGADA", `Se agregó "${inputVal}" correctamente.`, "success");
+        dom.sourceInput.value = '';
+        loadAgentsTabContent();
+      } catch (err) {
+        console.error(err);
+        showToast("ERROR", "No se pudo añadir la fuente: " + err.message, "danger");
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = originalText;
+      }
+    });
+  }
+
+  // Gatillo de "Desplegar Exploradores" (Orquestar Agentes)
+  if (dom.btnDeployAgents && dom.agentsConsole) {
+    dom.btnDeployAgents.addEventListener('click', async () => {
+      dom.btnDeployAgents.disabled = true;
+      const originalHTML = dom.btnDeployAgents.innerHTML;
+      dom.btnDeployAgents.innerHTML = `
+        <div class="cyber-spinner" style="width: 14px; height: 14px; border-width: 2px; border-top-color: var(--neon-cyan); border-bottom-color: var(--neon-purple); display: inline-block; vertical-align: middle;"></div>
+        <span style="vertical-align: middle; margin-left: 6px; color: #fff; font-size: 11px;">EJECUTANDO EXPLORADORES...</span>
+      `;
+
+      dom.agentsConsole.innerHTML = `
+        <div style="color: #00ffff; font-family: var(--font-geom); font-weight: 700; margin-bottom: 4px; border-bottom: 1px solid rgba(0, 255, 255, 0.1); padding-bottom: 2px; font-size: 9px; letter-spacing: 0.5px;">STATUS: CORRIENDO...</div>
+        <div class="console-line">> [INFO] Inicializando agentes de exploración autónoma...</div>
+        <div class="console-line">> [INFO] Leyendo fuentes monitoreadas de AMBA, Bogotá y Santiago...</div>
+        <div class="console-line">> [INFO] Iniciando conexión segura con Supabase Edge Function...</div>
+      `;
+      dom.agentsConsole.scrollTop = dom.agentsConsole.scrollHeight;
+
+      try {
+        const response = await runAgents();
+        const logs = response.logs || [];
+        const newCount = response.new_events_count || 0;
+
+        // Limpiar y renderizar consola de logs
+        dom.agentsConsole.innerHTML = `
+          <div style="color: #00ff87; font-family: var(--font-geom); font-weight: 700; margin-bottom: 4px; border-bottom: 1px solid rgba(0, 255, 255, 0.1); padding-bottom: 2px; font-size: 9px; letter-spacing: 0.5px;">STATUS: COMPLETADO (Nuevos: ${newCount})</div>
+        `;
+
+        // Añadir logs dinámicos línea por línea
+        logs.forEach(line => {
+          const lineEl = document.createElement('div');
+          lineEl.className = 'console-line';
+          lineEl.textContent = `> ${line}`;
+          if (line.includes('[ERROR]') || line.includes('[CRÍTICO]')) {
+            lineEl.style.color = '#ff3b6b';
+          } else if (line.includes('[ÉXITO]') || line.includes('FINALIZADA')) {
+            lineEl.style.color = '#00ff87';
+          } else if (line.includes('[AGENTE]') || line.includes('MONITOR') || line.includes('CRAWLER')) {
+            lineEl.style.color = 'rgba(0, 255, 255, 0.9)';
+          }
+          dom.agentsConsole.appendChild(lineEl);
+        });
+
+        dom.agentsConsole.scrollTop = dom.agentsConsole.scrollHeight;
+
+        if (newCount > 0) {
+          showToast("EXPLORACIÓN COMPLETADA", `¡Los agentes agregaron ${newCount} nuevos eventos a tu cartelera!`, "success");
+          await loadEventsForCurrentWeek();
+        } else {
+          showToast("EXPLORACIÓN COMPLETADA", `Exploración finalizada. No se encontraron nuevos eventos.`, "info");
+        }
+
+        // Recargar runs e historial
+        const newRuns = await getAgentRuns();
+        renderAgentRuns(newRuns);
+
+      } catch (err) {
+        console.error(err);
+        
+        dom.agentsConsole.innerHTML = `
+          <div style="color: #ff3b6b; font-family: var(--font-geom); font-weight: 700; margin-bottom: 4px; border-bottom: 1px solid rgba(0, 255, 255, 0.1); padding-bottom: 2px; font-size: 9px; letter-spacing: 0.5px;">STATUS: FALLIDO</div>
+          <div class="console-line" style="color: #ff3b6b;">> [ERROR] Ocurrió un fallo crítico en la Edge Function.</div>
+          <div class="console-line" style="color: #ff3b6b;">> [ERROR] Detalle: ${err.message || err}</div>
+        `;
+        dom.agentsConsole.scrollTop = dom.agentsConsole.scrollHeight;
+        showToast("FALLO DE AGENTE", err.message || "No se pudo completar la exploración autónoma.", "danger");
+      } finally {
+        dom.btnDeployAgents.disabled = false;
+        dom.btnDeployAgents.innerHTML = originalHTML;
+      }
+    });
+  }
 }
 
 function resetSuggestModal() {
-  dom.suggestForm.reset();
-  dom.suggestForm.classList.remove('hidden');
-  dom.suggestLoader.classList.add('hidden');
-  dom.suggestError.classList.add('hidden');
-  dom.previewArea.classList.add('hidden');
+  if (dom.suggestForm) dom.suggestForm.reset();
+  if (dom.suggestBulkForm) dom.suggestBulkForm.reset();
+  if (dom.addSourceForm) dom.addSourceForm.reset();
+  if (dom.suggestForm) dom.suggestForm.classList.remove('hidden');
+  if (dom.suggestBulkForm) dom.suggestBulkForm.classList.remove('hidden');
+  if (dom.suggestLoader) dom.suggestLoader.classList.add('hidden');
+  if (dom.suggestError) dom.suggestError.classList.add('hidden');
+  if (dom.previewArea) dom.previewArea.classList.add('hidden');
+  if (dom.bulkResultsArea) dom.bulkResultsArea.classList.add('hidden');
+  if (dom.bulkResultsList) dom.bulkResultsList.innerHTML = '';
+  if (dom.suggestLoaderText) dom.suggestLoaderText.textContent = "Analizando y enriqueciendo el evento con IA...";
+  if (dom.agentsConsole) {
+    dom.agentsConsole.innerHTML = `
+      <div style="color: rgba(0, 255, 255, 0.7); font-family: var(--font-geom); font-weight: 700; margin-bottom: 4px; border-bottom: 1px solid rgba(0, 255, 255, 0.1); padding-bottom: 2px; font-size: 9px; letter-spacing: 0.5px;">STATUS: INACTIVO</div>
+      <div class="console-line">> Listo para iniciar exploración autónoma.</div>
+    `;
+  }
   state.lastScrapedEvent = null;
-  dom.btnConfirmSave.disabled = false;
+  if (dom.btnConfirmSave) dom.btnConfirmSave.disabled = false;
+}
+
+// Funciones para cargar y renderizar la pestaña de agentes
+async function loadAgentsTabContent() {
+  try {
+    if (dom.sourcesList) dom.sourcesList.innerHTML = '<div style="font-size: 10px; color: rgba(255,255,255,0.4); padding: 8px;">Cargando fuentes...</div>';
+    if (dom.runsHistoryList) dom.runsHistoryList.innerHTML = '<div style="font-size: 10px; color: rgba(255,255,255,0.4); padding: 8px;">Cargando historial...</div>';
+
+    const [sources, runs] = await Promise.all([
+      getMonitoredSources(),
+      getAgentRuns()
+    ]);
+
+    renderMonitoredSources(sources);
+    renderAgentRuns(runs);
+  } catch (err) {
+    console.error("Error al cargar datos del panel de agentes:", err);
+    showToast("ERROR", "No se pudieron cargar los datos de exploración.", "danger");
+  }
+}
+
+function renderMonitoredSources(sources) {
+  if (!dom.sourcesList) return;
+  dom.sourcesList.innerHTML = '';
+
+  if (sources.length === 0) {
+    dom.sourcesList.innerHTML = '<div style="font-size: 10px; color: rgba(255,255,255,0.3); padding: 12px; text-align: center; border: 1px dashed rgba(255,255,255,0.06); border-radius: 6px;">No hay fuentes configuradas.</div>';
+    return;
+  }
+
+  const icons = {
+    luma_profile: `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; color: var(--neon-cyan); vertical-align: middle;">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>`,
+    twitter: `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; color: #1da1f2; vertical-align: middle;">
+        <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"></path>
+      </svg>`,
+    discord: `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; color: #5865f2; vertical-align: middle;">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>`
+  };
+
+  sources.forEach(source => {
+    const item = document.createElement('div');
+    item.style.display = 'flex';
+    item.style.alignItems = 'center';
+    item.style.justifyContent = 'space-between';
+    item.style.padding = '8px 10px';
+    item.style.background = 'rgba(255,255,255,0.02)';
+    item.style.border = '1px solid rgba(255,255,255,0.04)';
+    item.style.borderRadius = '6px';
+    item.style.gap = '8px';
+
+    const info = document.createElement('div');
+    info.style.display = 'flex';
+    info.style.alignItems = 'center';
+    info.style.gap = '8px';
+    info.style.overflow = 'hidden';
+    info.style.flex = '1';
+
+    const iconSpan = document.createElement('span');
+    iconSpan.innerHTML = icons[source.type] || '';
+    iconSpan.style.display = 'flex';
+
+    const textContainer = document.createElement('div');
+    textContainer.style.display = 'flex';
+    textContainer.style.flexDirection = 'column';
+    textContainer.style.overflow = 'hidden';
+
+    const handleSpan = document.createElement('span');
+    handleSpan.style.fontFamily = 'monospace';
+    handleSpan.style.fontSize = '10px';
+    handleSpan.style.color = '#fff';
+    handleSpan.style.whiteSpace = 'nowrap';
+    handleSpan.style.overflow = 'hidden';
+    handleSpan.style.textOverflow = 'ellipsis';
+    handleSpan.textContent = source.url_or_handle;
+
+    const subSpan = document.createElement('span');
+    subSpan.style.fontSize = '8px';
+    subSpan.style.color = 'rgba(255,255,255,0.4)';
+    subSpan.style.fontFamily = 'var(--font-geom)';
+    subSpan.style.fontWeight = '700';
+    subSpan.style.letterSpacing = '0.5px';
+    
+    const lastScanned = source.last_scanned_at 
+      ? new Date(source.last_scanned_at).toLocaleDateString() + ' ' + new Date(source.last_scanned_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      : 'Nunca';
+    subSpan.textContent = `${source.city} • Escaneo: ${lastScanned}`;
+
+    textContainer.appendChild(handleSpan);
+    textContainer.appendChild(subSpan);
+
+    info.appendChild(iconSpan);
+    info.appendChild(textContainer);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 10px; height: 10px; color: rgba(255,255,255,0.4);">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    `;
+    deleteBtn.style.background = 'transparent';
+    deleteBtn.style.border = 'none';
+    deleteBtn.style.cursor = 'pointer';
+    deleteBtn.style.padding = '4px';
+    deleteBtn.style.display = 'flex';
+    deleteBtn.style.alignItems = 'center';
+    deleteBtn.style.borderRadius = '4px';
+    deleteBtn.addEventListener('mouseover', () => {
+      deleteBtn.querySelector('svg').style.color = '#ff3b6b';
+      deleteBtn.style.background = 'rgba(255, 59, 107, 0.1)';
+    });
+    deleteBtn.addEventListener('mouseout', () => {
+      deleteBtn.querySelector('svg').style.color = 'rgba(255,255,255,0.4)';
+      deleteBtn.style.background = 'transparent';
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      if (confirm(`¿Estás seguro de que deseas eliminar esta fuente?`)) {
+        try {
+          deleteBtn.disabled = true;
+          await deleteMonitoredSource(source.id);
+          showToast("FUENTE ELIMINADA", "La fuente fue removida con éxito.", "success");
+          loadAgentsTabContent();
+        } catch (err) {
+          console.error(err);
+          showToast("ERROR", "No se pudo eliminar la fuente.", "danger");
+          deleteBtn.disabled = false;
+        }
+      }
+    });
+
+    item.appendChild(info);
+    item.appendChild(deleteBtn);
+    dom.sourcesList.appendChild(item);
+  });
+}
+
+function renderAgentRuns(runs) {
+  if (!dom.runsHistoryList) return;
+  dom.runsHistoryList.innerHTML = '';
+
+  if (runs.length === 0) {
+    dom.runsHistoryList.innerHTML = '<div style="font-size: 10px; color: rgba(255,255,255,0.3); padding: 8px; text-align: center;">No hay registros de ejecución anteriores.</div>';
+    return;
+  }
+
+  runs.forEach(run => {
+    const item = document.createElement('div');
+    item.style.display = 'flex';
+    item.style.justifyContent = 'space-between';
+    item.style.alignItems = 'center';
+    item.style.padding = '6px 8px';
+    item.style.background = 'rgba(255,255,255,0.01)';
+    item.style.border = '1px solid rgba(255,255,255,0.03)';
+    item.style.borderRadius = '4px';
+    item.style.fontSize = '9px';
+    item.style.fontFamily = 'monospace';
+
+    const info = document.createElement('span');
+    info.style.color = 'rgba(255,255,255,0.6)';
+    const date = new Date(run.started_at).toLocaleString();
+    info.textContent = `${date} • Nuevos: ${run.new_events_count}`;
+
+    const badge = document.createElement('span');
+    badge.style.fontWeight = 'bold';
+    badge.style.padding = '2px 6px';
+    badge.style.borderRadius = '3px';
+    badge.style.fontSize = '8px';
+
+    if (run.status === 'success') {
+      badge.style.color = '#00ff87';
+      badge.style.background = 'rgba(0, 255, 135, 0.1)';
+      badge.textContent = 'ÉXITO';
+    } else if (run.status === 'failed') {
+      badge.style.color = '#ff3b6b';
+      badge.style.background = 'rgba(255, 59, 107, 0.1)';
+      badge.textContent = 'FALLO';
+    } else {
+      badge.style.color = '#00ffff';
+      badge.style.background = 'rgba(0, 255, 255, 0.1)';
+      badge.textContent = 'CORRIENDO';
+    }
+
+    item.appendChild(info);
+    item.appendChild(badge);
+    dom.runsHistoryList.appendChild(item);
+  });
+}
+
+// Helpers para parser de importación masiva de archivos
+function getFieldMappings() {
+  return {
+    title: ['title', 'titulo', 'nombre', 'name'],
+    description: ['description', 'descripcion', 'info', 'about'],
+    event_date: ['event_date', 'fecha', 'fecha_evento', 'date'],
+    day_of_week: ['day_of_week', 'dia', 'dia_semana', 'day'],
+    time_range: ['time_range', 'rango_horario', 'hora', 'time', 'horario'],
+    location_type: ['location_type', 'tipo_ubicacion', 'modalidad', 'type'],
+    location_city: ['location_city', 'ciudad', 'ciudad_ubicacion', 'city'],
+    location_detail: ['location_detail', 'detalle_ubicacion', 'direccion', 'address', 'lugar', 'place'],
+    tags: ['tags', 'etiquetas', 'categorias', 'categories'],
+    cover_url: ['cover_url', 'url_portada', 'image', 'imagen', 'poster', 'cover'],
+    host_name: ['host_name', 'nombre_organizador', 'organizador', 'host', 'hosts'],
+    price_info: ['price_info', 'info_precio', 'precio', 'price', 'ticket'],
+    luma_url: ['luma_url', 'url_luma', 'url', 'link'],
+    original_timezone: ['original_timezone', 'timezone', 'zona_horaria'],
+    original_time_range: ['original_time_range', 'original_time']
+  };
+}
+
+function parseCSV(text) {
+  const lines = [];
+  let row = [""];
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i+1];
+    if (c === '"') {
+      if (inQuotes && next === '"') {
+        row[row.length - 1] += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      row.push("");
+    } else if ((c === '\r' || c === '\n') && !inQuotes) {
+      if (c === '\r' && next === '\n') {
+        i++;
+      }
+      lines.push(row);
+      row = [""];
+    } else {
+      row[row.length - 1] += c;
+    }
+  }
+  if (row.length > 1 || row[0] !== "") {
+    lines.push(row);
+  }
+  return lines;
+}
+
+function mapCSVItems(parsedLines) {
+  const fieldMappings = getFieldMappings();
+  const headers = parsedLines[0].map(h => h.trim().toLowerCase());
+  const rows = parsedLines.slice(1);
+  const items = [];
+
+  for (const row of rows) {
+    if (row.length === 1 && row[0] === '') continue;
+    const item = {};
+    for (let colIdx = 0; colIdx < headers.length; colIdx++) {
+      const header = headers[colIdx];
+      const val = row[colIdx] ? row[colIdx].trim() : '';
+      let matchedField = null;
+      for (const [field, aliases] of Object.entries(fieldMappings)) {
+        if (aliases.includes(header)) {
+          matchedField = field;
+          break;
+        }
+      }
+      if (matchedField) {
+        if (matchedField === 'tags') {
+          try {
+            item[matchedField] = JSON.parse(val);
+          } catch {
+            item[matchedField] = val ? val.split(',').map(t => t.trim()) : [];
+          }
+        } else {
+          item[matchedField] = val;
+        }
+      }
+    }
+    if (!item.luma_url) item.luma_url = null;
+    items.push(item);
+  }
+  return items;
+}
+
+function mapJSONItems(rawItems) {
+  const fieldMappings = getFieldMappings();
+  return rawItems.map(rawItem => {
+    const item = {};
+    for (const [key, val] of Object.entries(rawItem)) {
+      const cleanedKey = key.trim().toLowerCase();
+      let matchedField = null;
+      for (const [field, aliases] of Object.entries(fieldMappings)) {
+        if (aliases.includes(cleanedKey)) {
+          matchedField = field;
+          break;
+        }
+      }
+      if (matchedField) {
+        if (matchedField === 'tags') {
+          if (Array.isArray(val)) {
+            item[matchedField] = val;
+          } else if (typeof val === 'string') {
+            try {
+              item[matchedField] = JSON.parse(val);
+            } catch {
+              item[matchedField] = val.split(',').map(t => t.trim());
+            }
+          } else {
+            item[matchedField] = [];
+          }
+        } else {
+          item[matchedField] = val !== undefined && val !== null ? String(val).trim() : null;
+        }
+      }
+    }
+    if (!item.luma_url) item.luma_url = null;
+    return item;
+  });
 }
 
 function renderSuggestPreviewCard(event) {

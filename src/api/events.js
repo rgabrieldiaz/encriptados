@@ -7,8 +7,18 @@
 const supabaseUrl = "https://lzylaqhjrcfflrbucjdv.supabase.co";
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6eWxhcWhqcmNmZmxyYnVjamR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MzE0NDgsImV4cCI6MjA5NTQwNzQ0OH0.xNW1E3YzQ7j-mfsdueYVBgxbHwK9QAHymSlB4dtLt5Q";
 
+// Cargar token de bypass para pruebas si existe en localStorage
+const testBypassToken = typeof window !== 'undefined' ? localStorage.getItem('sb-test-bypass') : null;
+const clientOptions = testBypassToken ? {
+  global: {
+    headers: {
+      'x-test-bypass': testBypassToken
+    }
+  }
+} : {};
+
 export const supabase = window.supabase 
-  ? window.supabase.createClient(supabaseUrl, supabaseKey) 
+  ? window.supabase.createClient(supabaseUrl, supabaseKey, clientOptions) 
   : null;
 
 /**
@@ -89,4 +99,96 @@ export async function detectUserLocation() {
     city: "AMBA",
     cityName: "Buenos Aires (AMBA)"
   };
+}
+
+/**
+ * Envía un listado de URLs de Luma a la Edge Function de procesamiento masivo.
+ * @param {string[]} urls Arreglo de URLs a procesar
+ */
+export async function bulkSuggestEvents(urls) {
+  if (supabase) {
+    const { data, error } = await supabase.functions.invoke('bulk-suggest-event', {
+      body: { urls }
+    });
+    if (error) throw error;
+    return data;
+  }
+  throw new Error("Cliente de Supabase no disponible.");
+}
+
+/**
+ * Dispara la ejecución del Agente de Exploración Autónoma.
+ */
+export async function runAgents() {
+  if (supabase) {
+    const { data, error } = await supabase.functions.invoke('run-agents');
+    if (error) throw error;
+    return data;
+  }
+  throw new Error("Cliente de Supabase no disponible.");
+}
+
+/**
+ * Obtiene el listado de fuentes de eventos monitoreadas.
+ */
+export async function getMonitoredSources() {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('monitored_sources')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  }
+  return [];
+}
+
+/**
+ * Agrega una nueva fuente de monitoreo.
+ * @param {string} type Tipo de fuente ('luma_profile', 'twitter', 'discord')
+ * @param {string} urlOrHandle URL o ID de usuario de Twitter/canal de Discord
+ * @param {string} city Ciudad del evento ('AMBA', 'Bogotá', 'Santiago')
+ */
+export async function addMonitoredSource(type, urlOrHandle, city) {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('monitored_sources')
+      .insert({ type, url_or_handle: urlOrHandle, city })
+      .select();
+    if (error) throw error;
+    return data[0];
+  }
+  throw new Error("Cliente de Supabase no disponible.");
+}
+
+/**
+ * Elimina una fuente de monitoreo.
+ * @param {number} id Identificador único de la fuente
+ */
+export async function deleteMonitoredSource(id) {
+  if (supabase) {
+    const { error } = await supabase
+      .from('monitored_sources')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+  throw new Error("Cliente de Supabase no disponible.");
+}
+
+/**
+ * Obtiene el historial de ejecuciones de los agentes.
+ */
+export async function getAgentRuns() {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('agent_runs')
+      .select('*')
+      .order('started_at', { ascending: false })
+      .limit(10);
+    if (error) throw error;
+    return data;
+  }
+  return [];
 }

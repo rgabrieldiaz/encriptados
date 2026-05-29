@@ -2636,5 +2636,229 @@ dialog[open] {
   box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
 }
 
+/* Pestañas (Tabs) en el modal de sugerencias */
+.suggest-tabs {
+  display: flex;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 20px;
+}
 
+.suggest-tab-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: var(--font-geom);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  padding: 8px 4px 12px 4px;
+  transition: all var(--transition-fast);
+  border-bottom: 2px solid transparent;
+}
 
+.suggest-tab-btn:hover {
+  color: #fff;
+}
+
+.suggest-tab-btn.active {
+  color: var(--neon-cyan);
+  border-bottom-color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+}
+
+.suggest-tab-content.hidden {
+  display: none !important;
+}
+
+#suggest-bulk-input:focus {
+  border-color: var(--neon-purple) !important;
+  box-shadow: 0 0 10px rgba(138, 43, 226, 0.4);
+}
+
+/* Resultados de Carga Masiva (Bulk Results) */
+.bulk-results-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.bulk-results-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.bulk-results-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.bulk-results-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.bulk-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-geom);
+  font-size: 11px;
+  gap: 12px;
+  animation: slideInUp 0.3s ease forwards;
+}
+
+.bulk-result-item .event-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.bulk-result-item .event-url {
+  font-family: monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-result-item .event-title {
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-result-item .status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.bulk-result-item.status-success {
+  background: rgba(0, 255, 135, 0.04);
+  border-color: rgba(0, 255, 135, 0.15);
+}
+
+.bulk-result-item.status-success .status-badge {
+  color: #00ff87;
+  text-shadow: 0 0 8px rgba(0, 255, 135, 0.3);
+}
+
+.bulk-result-item.status-error {
+  background: rgba(255, 59, 107, 0.04);
+  border-color: rgba(255, 59, 107, 0.15);
+}
+
+.bulk-result-item.status-error .status-badge {
+  color: #ff3b6b;
+  text-shadow: 0 0 8px rgba(255, 59, 107, 0.3);
+}
+
+.bulk-result-item.status-error .event-title {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Panel de Agentes y Consola Cyberpunk */
+.cyber-console {
+  background: #04040a !important;
+  box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.1), 0 0 15px rgba(0, 255, 255, 0.05);
+  font-family: 'Courier New', Courier, monospace !important;
+  line-height: 1.4;
+  position: relative;
+  overflow-y: auto;
+}
+
+/* Efecto de línea de escaneo para la terminal */
+.cyber-console::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 2;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+.console-line {
+  font-family: 'Courier New', Courier, monospace !important;
+  color: #39ff14;
+  text-shadow: 0 0 5px rgba(57, 255, 20, 0.5);
+  word-break: break-all;
+  opacity: 0;
+  animation: consoleLineFadeIn 0.2s steps(20) forwards;
+}
+
+@keyframes consoleLineFadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Personalización del selector en el formulario de fuentes */
+#add-source-form select,
+#add-source-form input {
+  font-family: var(--font-geom);
+  font-size: 11px;
+  background: rgba(14, 14, 25, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+#add-source-form select:focus,
+#add-source-form input:focus {
+  border-color: var(--neon-cyan) !important;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.3) !important;
+}
+
+/* Scrollbar para la consola de los agentes */
+.cyber-console::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cyber-console::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.cyber-console::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.3);
+  border-radius: 2px;
+}
+
+.cyber-console::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.5);
+}
+
+/* Animación del cursor del historial */
+#runs-history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+#runs-history-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+#runs-history-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+}
