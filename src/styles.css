@@ -1106,8 +1106,8 @@ body {
   flex: 0 0 280px;
   width: 280px;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .modal-col-right .modal-cover-container {
@@ -1126,16 +1126,33 @@ body {
 
 @media (max-width: 767px) {
   .modal-detail-layout {
-    flex-direction: column-reverse;
+    flex-direction: column;
     gap: 16px;
   }
+  .modal-col-left,
   .modal-col-right {
-    flex: 0 0 auto;
-    width: 100%;
+    display: contents;
   }
-  .modal-col-right .modal-cover-container {
+  .modal-cover-container {
+    order: 1;
+    width: 100%;
     height: 180px;
     margin-bottom: 0;
+  }
+  .modal-header-tags {
+    order: 2;
+  }
+  .modal-title {
+    order: 3;
+  }
+  .modal-meta-grid {
+    order: 4;
+  }
+  .modal-description {
+    order: 5;
+  }
+  .modal-actions {
+    order: 6;
   }
   #event-modal .modal-card {
     max-width: 480px;
