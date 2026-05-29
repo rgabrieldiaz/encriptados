@@ -116,6 +116,31 @@
           </div>
         </div>
 
+        <!-- Barra de Filtros (Pills de Filtrado) -->
+        <div class="calendar-filters" id="calendar-filters">
+          <!-- Filtro de Favoritos (Botón Pastilla Toggle) -->
+          <button class="filter-pill" id="btn-filter-favorites" data-active="false">
+            <svg class="icon-bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Favoritos</span>
+          </button>
+
+          <!-- Filtro de Precio (Pastilla Segmentada) -->
+          <div class="filter-pill-group" id="filter-price-group">
+            <button class="filter-option active" data-price="all">Todos</button>
+            <button class="filter-option" data-price="free">Gratis</button>
+            <button class="filter-option" data-price="paid">De pago</button>
+          </div>
+
+          <!-- Filtro de Modalidad (Pastilla Segmentada) -->
+          <div class="filter-pill-group" id="filter-modality-group">
+            <button class="filter-option active" data-modality="all">Todos</button>
+            <button class="filter-option" data-modality="presencial">Presencial</button>
+            <button class="filter-option" data-modality="virtual">A distancia</button>
+          </div>
+        </div>
+
         <!-- Encabezado de los días de la semana (Vista Semanal) -->
         <div class="calendar-days-header" id="calendar-days-header">
           <div class="day-label-col">LUN</div>

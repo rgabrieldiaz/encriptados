@@ -15,7 +15,12 @@ const state = {
   currentView: "diario", // 'diario', 'semanal', 'mensual'
   activeDay: daysOrder[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1],
   referenceDate: new Date(), // Fecha enfocada por el calendario
-  currentDate: new Date()    // Fecha de hoy real de su sistema
+  currentDate: new Date(),   // Fecha de hoy real de su sistema
+  filters: {
+    favorites: false,
+    price: 'all',     // 'all', 'free', 'paid'
+    modality: 'all'   // 'all', 'presencial', 'virtual'
+  }
 };
 
 let weekDates = {};
@@ -453,6 +458,33 @@ function ensureHoursSidebar(column) {
 }
 
 /**
+ * Filtra el listado de eventos de acuerdo a las pastillas de filtrado activas.
+ */
+function getFilteredEvents() {
+  return state.events.filter(event => {
+    // 1. Filtro de Favoritos
+    if (state.filters.favorites && !state.userCalendar.includes(event.id)) {
+      return false;
+    }
+    // 2. Filtro de Precio
+    if (state.filters.price === 'free') {
+      const isFree = event.price_info ? (event.price_info.toLowerCase().includes('gratis') || event.price_info.toLowerCase().includes('free')) : true;
+      if (!isFree) return false;
+    } else if (state.filters.price === 'paid') {
+      const isFree = event.price_info ? (event.price_info.toLowerCase().includes('gratis') || event.price_info.toLowerCase().includes('free')) : true;
+      if (isFree) return false;
+    }
+    // 3. Filtro de Modalidad
+    if (state.filters.modality === 'presencial') {
+      if (event.location_type !== 'presencial') return false;
+    } else if (state.filters.modality === 'virtual') {
+      if (event.location_type === 'presencial') return false; // virtual/distancia
+    }
+    return true;
+  });
+}
+
+/**
  * Renderiza los eventos en sus columnas correspondientes.
  */
 function renderEvents() {
@@ -485,7 +517,7 @@ function renderEvents() {
     MON: [], TUE: [], WED: [], THU: [], FRI: [], SAT: [], SUN: []
   };
 
-  state.events.forEach(event => {
+  getFilteredEvents().forEach(event => {
     const day = event.dayOfWeek;
     const colDate = weekDates[day];
     if (!colDate) return;
@@ -877,6 +909,38 @@ function initDayNavigation() {
   });
 }
 
+function initFilters() {
+  const btnFavorites = document.getElementById('btn-filter-favorites');
+  const priceOptions = document.querySelectorAll('#filter-price-group .filter-option');
+  const modalityOptions = document.querySelectorAll('#filter-modality-group .filter-option');
+
+  if (btnFavorites) {
+    btnFavorites.addEventListener('click', () => {
+      state.filters.favorites = !state.filters.favorites;
+      btnFavorites.classList.toggle('active', state.filters.favorites);
+      renderEvents();
+    });
+  }
+
+  priceOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+      priceOptions.forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      state.filters.price = opt.getAttribute('data-price');
+      renderEvents();
+    });
+  });
+
+  modalityOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+      modalityOptions.forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      state.filters.modality = opt.getAttribute('data-modality');
+      renderEvents();
+    });
+  });
+}
+
 async function navigateCalendar(direction) {
   if (state.currentView === 'diario') {
     const currentIndex = daysOrder.indexOf(state.activeDay);
@@ -1092,7 +1156,7 @@ function renderMonthGrid() {
       const ddStr = String(dayNum).padStart(2, '0');
       const dateStr = `${year}-${mmStr}-${ddStr}`;
 
-      const dayEvents = state.events.filter(e => e.date === dateStr);
+      const dayEvents = getFilteredEvents().filter(e => e.date === dateStr);
 
       if (dayEvents.length > 0) {
         cell.classList.add('has-events');
@@ -1856,6 +1920,7 @@ async function initApp() {
   // Iniciar Selector de Vistas y Navegación Diaria
   initViewSwitcher();
   initDayNavigation();
+  initFilters();
 
   // Inicializar botón/pill de período temporal
   if (dom.timePeriodPill) {
