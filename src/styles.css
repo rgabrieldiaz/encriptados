@@ -534,6 +534,21 @@ body {
   gap: 14px;
   margin-top: 10px;
   animation: fadeInMonth 0.5s ease-out;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 6px;
+  /* Scrollbar personalizado para el scroll de la grilla mensual */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.calendar-month-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-month-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 @keyframes fadeInMonth {
@@ -684,6 +699,21 @@ body {
   grid-template-columns: repeat(7, 1fr);
   gap: 14px;
   min-height: 540px;
+  max-height: 600px;
+  overflow-y: auto;
+  padding-right: 6px;
+  /* Scrollbar personalizado para el scroll de la grilla semanal */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.calendar-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 .calendar-column {
@@ -2151,6 +2181,9 @@ dialog[open] {
   max-width: 900px; /* Ancho equilibrado para soportar solapamientos de forma legible */
   margin: 0 auto;
   min-height: auto;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .calendar-grid.view-diario .calendar-column {
