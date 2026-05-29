@@ -2356,10 +2356,20 @@ function updateAuthUI(session) {
     if (dom.btnLoginTrigger) dom.btnLoginTrigger.classList.add('hidden');
     if (dom.userProfile) dom.userProfile.classList.remove('hidden');
     if (dom.userEmailDisplay) dom.userEmailDisplay.textContent = session.user.email;
+    
+    // Mostrar "Sugerir Evento" únicamente para gabrieldiaz81@gmail.com
+    if (session.user.email === 'gabrieldiaz81@gmail.com') {
+      if (dom.btnSuggestTrigger) dom.btnSuggestTrigger.classList.remove('hidden');
+    } else {
+      if (dom.btnSuggestTrigger) dom.btnSuggestTrigger.classList.add('hidden');
+    }
   } else {
     if (dom.btnLoginTrigger) dom.btnLoginTrigger.classList.remove('hidden');
     if (dom.userProfile) dom.userProfile.classList.add('hidden');
     if (dom.userEmailDisplay) dom.userEmailDisplay.textContent = '';
+    
+    // Ocultar si no hay sesión iniciada
+    if (dom.btnSuggestTrigger) dom.btnSuggestTrigger.classList.add('hidden');
   }
 }
 
