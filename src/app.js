@@ -855,6 +855,9 @@ function switchView(viewName) {
 
   // Actualizar estado del pill temporal
   updatePeriodPillState();
+
+  // Actualizar la línea horaria del día de hoy
+  updateCurrentTimeLine();
 }
 
 function updateActiveDayColumn() {
@@ -895,6 +898,7 @@ function updateActiveDayColumn() {
   });
 
   updateNavigationTitle();
+  updateCurrentTimeLine();
 }
 
 function initDayNavigation() {
@@ -939,6 +943,43 @@ function initFilters() {
       renderEvents();
     });
   });
+}
+
+let currentTimeLineInterval = null;
+
+function updateCurrentTimeLine() {
+  // 1. Buscar la columna activa en la vista diaria
+  const activeCol = document.querySelector('.calendar-grid.view-diario .calendar-column.active-day-col');
+  
+  // Remover línea existente de cualquier columna
+  const existingLines = document.querySelectorAll('.current-time-line');
+  existingLines.forEach(line => line.remove());
+
+  // Si no estamos en vista diaria, o la columna activa no es hoy, salir
+  if (state.currentView !== 'diario' || !activeCol || !activeCol.classList.contains('today-column')) {
+    return;
+  }
+
+  // 2. Calcular la posición top en base al horario actual local del usuario
+  const now = new Date();
+  const hours = now.getHours();
+  const minutes = now.getMinutes();
+  const timeDecimal = hours + minutes / 60;
+
+  // 3. Crear el elemento de la línea
+  const line = document.createElement('div');
+  line.className = 'current-time-line';
+  
+  // Alinear con el padding top (16px) de la columna
+  line.style.top = `calc(${timeDecimal} * var(--hour-height) + 16px)`;
+
+  activeCol.appendChild(line);
+}
+
+function startCurrentTimeLineUpdater() {
+  if (currentTimeLineInterval) clearInterval(currentTimeLineInterval);
+  updateCurrentTimeLine();
+  currentTimeLineInterval = setInterval(updateCurrentTimeLine, 60000); // Actualizar cada minuto
 }
 
 async function navigateCalendar(direction) {
@@ -1982,6 +2023,9 @@ async function initApp() {
 
   // 7. Inicializar la vista predeterminada (Diario)
   switchView(state.currentView);
+
+  // Iniciar actualizador periódico de la línea temporal
+  startCurrentTimeLineUpdater();
 }
 
 // Arrancar cuando el DOM esté listo

@@ -770,7 +770,7 @@ body {
 
 /* Estado de columna vacía */
 .events-wrapper:empty::after {
-  content: "SIN EVENTOS HOY";
+  content: "SIN EVENTOS";
   font-family: var(--font-geom);
   font-size: 8px;
   font-weight: 700;
@@ -2429,6 +2429,32 @@ dialog[open] {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Línea de Tiempo Actual (Daily View Time Marker) */
+.current-time-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--neon-purple);
+  box-shadow: 0 0 10px var(--neon-purple);
+  z-index: 15;
+  pointer-events: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Indicadores de brillo en los extremos (izq y der) */
+.current-time-line::before,
+.current-time-line::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 8px #ffffff, 0 0 15px var(--neon-purple);
 }
 
 
