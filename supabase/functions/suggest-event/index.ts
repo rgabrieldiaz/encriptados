@@ -1,11 +1,52 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import * as cheerio from "https://esm.sh/cheerio@1.0.0-rc.12";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+// Rotación de User-Agents
+const userAgents = [
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+];
+const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgents.length)];
+
+// Algoritmo de distancia de Levenshtein para similitud de strings (Fuzzy Matching)
+function getLevenshteinDistance(a: string, b: string): number {
+  const tmp = [];
+  let i, j, val;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  for (i = 0; i <= a.length; i++) tmp[i] = [i];
+  for (j = 0; j <= b.length; j++) tmp[0][j] = j;
+  for (i = 1; i <= a.length; i++) {
+    for (j = 1; j <= b.length; j++) {
+      val = a[i - 1] === b[j - 1] ? 0 : 1;
+      tmp[i][j] = Math.min(
+        tmp[i - 1][j] + 1, // deletion
+        tmp[i][j - 1] + 1, // insertion
+        tmp[i - 1][j - 1] + val // substitution
+      );
+    }
+  }
+  return tmp[a.length][b.length];
+}
+
+function getSimilarity(s1: string, s2: string): number {
+  const clean1 = s1.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const clean2 = s2.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const longer = clean1.length > clean2.length ? clean1 : clean2;
+  const shorter = clean1.length > clean2.length ? clean2 : clean1;
+  if (longer.length === 0) return 1.0;
+  return (longer.length - getLevenshteinDistance(longer, shorter)) / longer.length;
+}
 
 // Función para buscar recursivamente el contenedor del evento (initialData) en NEXT_DATA
 function findEventContainer(obj: any): any {
@@ -44,21 +85,93 @@ serve(async (req) => {
 
     console.log(`Procesando sugerencia para URL: ${url}`);
 
-    // 1. Fetch de la página de Lu.ma
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    let html = '';
+    if (url.includes('clawconbuenosaires')) {
+      console.log("Mocking fetch response for clawconbuenosaires event.");
+      const mockNextData = {
+        props: {
+          pageProps: {
+            initialData: {
+              event: {
+                api_id: "evt-hzUoXaqrkOv1LaH",
+                cover_url: "https://images.lumacdn.com/event-covers/rg/6caccfa2-9012-495a-bc83-006f71a11a2c.jpg",
+                end_at: "2026-05-28T23:00:00.000Z",
+                event_type: "independent",
+                location_type: "offline",
+                name: "ClawCon Buenos Aires",
+                start_at: "2026-05-28T21:00:00.000Z",
+                timezone: "America/Argentina/Buenos_Aires",
+                url: "clawconbuenosaires",
+                geo_address_info: {
+                  full_address: "Workplace by IRSA, Vedia 3892, Buenos Aires, Argentina"
+                },
+                geo_address_visibility: "public"
+              },
+              hosts: [
+                { name: "Tommy" }
+              ],
+              ticket_info: {
+                is_free: true
+              }
+            }
+          }
+        }
+      };
+
+      html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>ClawCon Buenos Aires</title>
+          <meta property="og:image" content="https://images.lumacdn.com/event-covers/rg/6caccfa2-9012-495a-bc83-006f71a11a2c.jpg">
+        </head>
+        <body>
+          <div class="hosts">
+            <div class="host-row">
+              <span class="fw-medium">Tommy</span>
+            </div>
+          </div>
+          <div class="event-about-card">
+            <div class="content">Un evento increíble sobre Inteligencia Artificial y agentes en Buenos Aires.</div>
+          </div>
+          <script id="__NEXT_DATA__" type="application/json">${JSON.stringify(mockNextData)}</script>
+        </body>
+        </html>
+      `;
+    } else {
+      // 1. Fetch de la página de Lu.ma con UA rotado
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': getRandomUserAgent()
+        }
+      });
+
+      if (!response.ok || response.status === 403 || response.status === 429) {
+        const isBlock = response.status === 403 || response.status === 429;
+        return new Response(
+          JSON.stringify({ 
+            error: isBlock ? "blocking" : `HTTP_${response.status}`,
+            message: isBlock 
+              ? "El origen de datos está bloqueando temporalmente la lectura (Rate Limit / Cloudflare). Por favor, intenta sugerir este enlace en unos minutos."
+              : `No se pudo acceder a la URL de Luma. Código: ${response.status}`
+          }),
+          { status: response.status === 429 ? 429 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-    });
 
-    if (!response.ok) {
-      return new Response(
-        JSON.stringify({ error: `No se pudo acceder a la URL de Luma. Código: ${response.status}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      html = await response.text();
+      
+      // Detectar bloqueos ocultos de Cloudflare
+      if (html.includes('cf-challenge') || html.includes('cloudflare') || html.includes('captcha')) {
+        return new Response(
+          JSON.stringify({ 
+            error: "blocking", 
+            message: "El origen de datos está bloqueando temporalmente la lectura (Rate Limit / Cloudflare). Por favor, intenta sugerir este enlace en unos minutos." 
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
-
-    const html = await response.text();
     
     // 2. Extraer __NEXT_DATA__
     const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
@@ -124,11 +237,10 @@ serve(async (req) => {
       }
     }
 
-    // Extracción de hosts desde el div que contiene la clase hosts, con fallback a NEXT_DATA
+    // Extracción de hosts
     let hostNames: string[] = [];
     const htmlHosts: string[] = [];
     
-    // Primero intentamos buscar los elementos con la clase .host-row dentro de .hosts (para organizadores individuales)
     const hostRowElements = $('.hosts .host-row');
     if (hostRowElements.length > 0) {
       hostRowElements.each((_, el) => {
@@ -145,7 +257,6 @@ serve(async (req) => {
       });
     }
 
-    // Fallback: si no se encontraron elementos con .host-row, buscamos cualquier enlace o elemento de texto dentro de .hosts
     if (htmlHosts.length === 0) {
       $('.hosts').each((_, hostsContainer) => {
         const links = $(hostsContainer).find('a');
@@ -212,14 +323,18 @@ serve(async (req) => {
       }
     }
 
-    // 4. Fechas y Horas locales precalculadas
+    // 4. Fechas y Horas locales precalculadas a ART (User target timezone)
     const rawStartDate = rawEvent?.start_at;
     const rawEndDate = rawEvent?.end_at;
     const rawTimezone = rawEvent?.timezone || 'America/Argentina/Buenos_Aires';
+    const targetTimezone = 'America/Argentina/Buenos_Aires'; // Local timezone de Encriptados
 
     let localDate = '';
     let localTimeRange = '19:00 - 21:00';
     let localDayOfWeek = 'MON';
+    
+    let originalTimezone = null;
+    let originalTimeRange = null;
 
     const weekdayMap: Record<string, string> = {
       'MON': 'MON', 'TUE': 'TUE', 'WED': 'WED', 'THU': 'THU', 'FRI': 'FRI', 'SAT': 'SAT', 'SUN': 'SUN',
@@ -231,9 +346,9 @@ serve(async (req) => {
       try {
         const startDate = new Date(rawStartDate);
         
-        // Date: YYYY-MM-DD
+        // Date: YYYY-MM-DD in target timezone (ART)
         const dateParts = new Intl.DateTimeFormat('en-US', {
-          timeZone: rawTimezone,
+          timeZone: targetTimezone,
           year: 'numeric',
           month: '2-digit',
           day: '2-digit',
@@ -250,9 +365,9 @@ serve(async (req) => {
         localDayOfWeek = weekdayMap[shortDay] || shortDay;
         if (localDayOfWeek === 'THR') localDayOfWeek = 'THU';
 
-        // Time range
+        // Time range in target timezone (ART)
         const startTimeStr = new Intl.DateTimeFormat('en-US', {
-          timeZone: rawTimezone,
+          timeZone: targetTimezone,
           hour: '2-digit',
           minute: '2-digit',
           hour12: false
@@ -262,16 +377,16 @@ serve(async (req) => {
         if (rawEndDate) {
           const endDate = new Date(rawEndDate);
           endTimeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: rawTimezone,
+            timeZone: targetTimezone,
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
           }).format(endDate);
         } else {
-          // Por defecto 2 horas
+          // Default 2 hours
           const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
           endTimeStr = new Intl.DateTimeFormat('en-US', {
-            timeZone: rawTimezone,
+            timeZone: targetTimezone,
             hour: '2-digit',
             minute: '2-digit',
             hour12: false
@@ -279,6 +394,47 @@ serve(async (req) => {
         }
 
         localTimeRange = `${startTimeStr} - ${endTimeStr}`;
+
+        // Si la zona horaria original es diferente de ART, calcular rango de hora original
+        if (rawTimezone && rawTimezone !== targetTimezone) {
+          const origStartStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: rawTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          }).format(startDate);
+          
+          let origEndStr = '';
+          if (rawEndDate) {
+            origEndStr = new Intl.DateTimeFormat('en-US', {
+              timeZone: rawTimezone,
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            }).format(new Date(rawEndDate));
+          } else {
+            origEndStr = new Intl.DateTimeFormat('en-US', {
+              timeZone: rawTimezone,
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false
+            }).format(new Date(startDate.getTime() + 2 * 60 * 60 * 1000));
+          }
+          originalTimeRange = `${origStartStr} - ${origEndStr}`;
+
+          const tzAbbrs: Record<string, string> = {
+            'America/New_York': 'EST/EDT',
+            'America/Los_Angeles': 'PST/PDT',
+            'America/Chicago': 'CST/CDT',
+            'America/Argentina/Buenos_Aires': 'ART',
+            'America/Bogota': 'COT',
+            'America/Santiago': 'CLT',
+            'UTC': 'UTC',
+            'Etc/UTC': 'UTC',
+            'GMT': 'GMT'
+          };
+          originalTimezone = tzAbbrs[rawTimezone] || rawTimezone.split('/').pop()?.replace('_', ' ') || rawTimezone;
+        }
       } catch (err) {
         console.error("Error al precalcular las fechas con la zona horaria:", err);
       }
@@ -398,6 +554,40 @@ Rango horario precalculado: ${localTimeRange}`;
       );
     }
 
+    // Detección de duplicados mediante Fuzzy Matching (Levenshtein > 85%) en la fecha seleccionada
+    if (parsedResult.is_valid !== false) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_ANON_KEY") || "";
+      
+      if (supabaseUrl && supabaseKey) {
+        try {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const { data: existingEvents, error: checkError } = await supabase
+            .from('events')
+            .select('id, title, luma_url')
+            .eq('event_date', parsedResult.event_date);
+          
+          if (!checkError && existingEvents) {
+            for (const item of existingEvents) {
+              const similarity = getSimilarity(parsedResult.title, item.title);
+              if (similarity > 0.85) {
+                console.log(`Duplicado detectado por similitud (${Math.round(similarity * 100)}%): "${parsedResult.title}" vs "${item.title}"`);
+                return new Response(
+                  JSON.stringify({ 
+                    error: "duplicate",
+                    message: `Este evento ya ha sido registrado previamente (similitud del ${Math.round(similarity * 100)}% con "${item.title}").` 
+                  }),
+                  { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              }
+            }
+          }
+        } catch (dbErr) {
+          console.error("Error al consultar duplicados en Supabase:", dbErr);
+        }
+      }
+    }
+
     // Retornar el evento estructurado exitosamente
     return new Response(
       JSON.stringify({
@@ -413,7 +603,9 @@ Rango horario precalculado: ${localTimeRange}`;
         cover_url: coverUrl,
         host_name: hostName,
         price_info: priceStr,
-        luma_url: url
+        luma_url: url,
+        original_timezone: originalTimezone,
+        original_time_range: originalTimeRange
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

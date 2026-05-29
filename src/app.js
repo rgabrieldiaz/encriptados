@@ -16,6 +16,8 @@ const state = {
   activeDay: daysOrder[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1],
   referenceDate: new Date(), // Fecha enfocada por el calendario
   currentDate: new Date(),   // Fecha de hoy real de su sistema
+  fetchedStart: null,
+  fetchedEnd: null,
   filters: {
     favorites: false,
     price: 'all',     // 'all', 'free', 'paid'
@@ -124,7 +126,22 @@ const dom = {
   confirmPrice: document.getElementById('confirm-price'),
   confirmType: document.getElementById('confirm-type'),
   confirmLocation: document.getElementById('confirm-location'),
-  confirmPosterImg: document.getElementById('confirm-poster-img')
+  confirmPosterImg: document.getElementById('confirm-poster-img'),
+
+  // Selectores para Autenticación y Compartir
+  btnLoginTrigger: document.getElementById('btn-login-trigger'),
+  loginModal: document.getElementById('login-modal'),
+  loginCloseBtn: document.getElementById('login-close-btn'),
+  loginForm: document.getElementById('login-form'),
+  loginEmailInput: document.getElementById('login-email-input'),
+  loginError: document.getElementById('login-error'),
+  loginLoader: document.getElementById('login-loader'),
+  loginSuccessMsg: document.getElementById('login-success-msg'),
+  btnLoginSubmit: document.getElementById('btn-login-submit'),
+  userProfile: document.getElementById('user-profile'),
+  userEmailDisplay: document.getElementById('user-email-display'),
+  btnLogout: document.getElementById('btn-logout'),
+  modalShareBtn: document.getElementById('modal-share-btn')
 };
 
 // ==========================================================================
@@ -313,9 +330,74 @@ async function loadEventsByCity(city) {
   dom.calendarGrid.style.transition = 'all 0.3s ease';
 
   try {
-    const events = await getEvents(city, state.referenceDate);
-    state.events = events;
-    renderEvents();
+    // Calcular el rango visible necesario
+    let reqStart = new Date(state.referenceDate);
+    let reqEnd = new Date(state.referenceDate);
+    
+    if (state.currentView === 'diario' || state.currentView === 'semanal') {
+      const mon = getMondayOfDate(state.referenceDate);
+      reqStart = new Date(mon);
+      reqEnd = new Date(mon);
+      reqEnd.setDate(mon.getDate() + 6);
+    } else if (state.currentView === 'mensual') {
+      const y = state.referenceDate.getFullYear();
+      const m = state.referenceDate.getMonth();
+      reqStart = new Date(y, m, 1);
+      reqStart.setDate(reqStart.getDate() - 7);
+      reqEnd = new Date(y, m + 1, 0);
+      reqEnd.setDate(reqEnd.getDate() + 7);
+    }
+    
+    const reqStartStr = reqStart.toISOString().split('T')[0];
+    const reqEndStr = reqEnd.toISOString().split('T')[0];
+
+    const isCached = state.fetchedStart && state.fetchedEnd && 
+                     reqStartStr >= state.fetchedStart && 
+                     reqEndStr <= state.fetchedEnd;
+
+    if (isCached) {
+      console.log(`Rango [${reqStartStr} a ${reqEndStr}] ya está en caché. Renderizando localmente.`);
+      renderEvents();
+    } else {
+      let fetchStartStr, fetchEndStr;
+      
+      if (!state.fetchedStart && !state.fetchedEnd) {
+        // Rango de consulta por defecto inicial: hoy - 7 días hasta hoy + 60 días
+        const firstStart = new Date(state.currentDate);
+        firstStart.setDate(firstStart.getDate() - 7);
+        const firstEnd = new Date(state.currentDate);
+        firstEnd.setDate(firstEnd.getDate() + 60);
+        fetchStartStr = firstStart.toISOString().split('T')[0];
+        fetchEndStr = firstEnd.toISOString().split('T')[0];
+      } else {
+        // Prefetch en background ampliado: reqStart - 30 días hasta reqEnd + 60 días
+        const fetchStart = new Date(reqStart);
+        fetchStart.setDate(fetchStart.getDate() - 30);
+        const fetchEnd = new Date(reqEnd);
+        fetchEnd.setDate(fetchEnd.getDate() + 60);
+        fetchStartStr = fetchStart.toISOString().split('T')[0];
+        fetchEndStr = fetchEnd.toISOString().split('T')[0];
+      }
+
+      console.log(`Caché falló para rango visible [${reqStartStr} a ${reqEndStr}]. Solicitando en Supabase: [${fetchStartStr} a ${fetchEndStr}].`);
+      
+      const events = await getEvents(city, state.referenceDate, fetchStartStr, fetchEndStr);
+      
+      // Fusionar eventos nuevos
+      const existingIds = new Set(state.events.map(e => e.id));
+      const newEvents = events.filter(e => !existingIds.has(e.id));
+      state.events = [...state.events, ...newEvents];
+
+      // Actualizar límites de caché
+      if (!state.fetchedStart || fetchStartStr < state.fetchedStart) {
+        state.fetchedStart = fetchStartStr;
+      }
+      if (!state.fetchedEnd || fetchEndStr > state.fetchedEnd) {
+        state.fetchedEnd = fetchEndStr;
+      }
+
+      renderEvents();
+    }
   } catch (error) {
     console.error("Error al cargar los eventos:", error);
   } finally {
@@ -1240,16 +1322,44 @@ function renderMonthGrid() {
 /**
  * Agrega o elimina un evento de favoritos (local storage) y sincroniza los botones.
  */
-function toggleCalendarEvent(event, buttonElement) {
+async function toggleCalendarEvent(event, buttonElement) {
   const index = state.userCalendar.indexOf(event.id);
   const isAdding = index === -1;
 
   if (isAdding) {
     state.userCalendar.push(event.id);
     showToast("EVENTO REGISTRADO", `${event.title} añadido a tus favoritos.`, "success");
+
+    if (supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase
+            .from('user_calendar')
+            .insert({ user_id: session.user.id, event_id: event.id });
+        }
+      } catch (err) {
+        console.error("Error saving bookmark to Supabase:", err);
+      }
+    }
   } else {
     state.userCalendar.splice(index, 1);
     showToast("EVENTO ELIMINADO", `${event.title} removido de tus favoritos.`, "info");
+
+    if (supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase
+            .from('user_calendar')
+            .delete()
+            .eq('user_id', session.user.id)
+            .eq('event_id', event.id);
+        }
+      } catch (err) {
+        console.error("Error deleting bookmark from Supabase:", err);
+      }
+    }
   }
 
   // Guardar en almacenamiento local
@@ -1676,6 +1786,19 @@ function openEventModal(event) {
   dom.modalDate.textContent = localDateStr.charAt(0).toUpperCase() + localDateStr.slice(1);
 
   dom.modalTime.textContent = `${event.time} hs`;
+  
+  // Renderizar alerta de zona horaria
+  const tzWarning = document.getElementById('modal-timezone-warning');
+  const tzText = document.getElementById('modal-timezone-text');
+  if (tzWarning && tzText) {
+    if (event.original_timezone && event.original_time_range) {
+      tzText.textContent = `Original: ${event.original_time_range} (${event.original_timezone})`;
+      tzWarning.classList.remove('hidden');
+    } else {
+      tzWarning.classList.add('hidden');
+    }
+  }
+
   dom.modalLocation.textContent = `${event.location_detail} (${event.location_city})`;
   dom.modalDescription.textContent = event.description;
 
@@ -1718,6 +1841,39 @@ function openEventModal(event) {
     dom.modalBookmarkBtn.onclick = (e) => {
       e.stopPropagation();
       toggleCalendarEvent(event, dom.modalAddBtn);
+    };
+  }
+
+  // Configurar botón compartir
+  if (dom.modalShareBtn) {
+    dom.modalShareBtn.onclick = async (e) => {
+      e.stopPropagation();
+      const shareUrl = `${window.location.origin}${window.location.pathname}?event=${event.id}`;
+      const shareData = {
+        title: event.title,
+        text: `Mira este evento en Encriptados: ${event.title} (${event.time} hs)`,
+        url: shareUrl
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          showToast("EVENTO COMPARTIDO", "¡Gracias por difundir el evento!", "success");
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            console.error("Error sharing:", err);
+          }
+        }
+      } else {
+        // Fallback: Copiar enlace al portapapeles
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          showToast("ENLACE COPIADO", "Enlace del evento copiado al portapapeles.", "success");
+        } catch (err) {
+          console.error("Error copying link:", err);
+          showToast("ERROR", "No se pudo copiar el enlace.", "danger");
+        }
+      }
     };
   }
 
@@ -1877,7 +2033,7 @@ function initSuggestModal() {
         try {
           if (error.context && typeof error.context.json === 'function') {
             const bodyErr = await error.context.json();
-            errorMsg = bodyErr.error || bodyErr.message || errorMsg;
+            errorMsg = bodyErr.message || bodyErr.error || errorMsg;
           } else {
             errorMsg = error.message || errorMsg;
           }
@@ -2048,6 +2204,10 @@ async function initApp() {
   // Inicializar modal de sugerencias
   initSuggestModal();
 
+  // Inicializar Autenticación y Deep-Linking
+  initAuth();
+  initDeepLinking();
+
   // 5. Autodetección de Ubicación por IP (Simulación)
   try {
     const locationData = await detectUserLocation();
@@ -2078,6 +2238,213 @@ async function initApp() {
 
   // Iniciar actualizador periódico de la línea temporal
   startCurrentTimeLineUpdater();
+}
+
+// ==========================================================================
+// SECCIÓN DE AUTENTICACIÓN (Magic Link) Y DEEP LINKING
+// ==========================================================================
+
+function initAuth() {
+  if (!supabase) return;
+
+  // Abrir modal de inicio de sesión
+  if (dom.btnLoginTrigger && dom.loginModal) {
+    dom.btnLoginTrigger.addEventListener('click', () => {
+      dom.loginModal.showModal();
+      resetLoginModal();
+    });
+  }
+
+  // Cerrar modal de inicio de sesión
+  if (dom.loginCloseBtn && dom.loginModal) {
+    dom.loginCloseBtn.addEventListener('click', () => {
+      dom.loginModal.close();
+      resetLoginModal();
+    });
+  }
+
+  // Cerrar al clickear fuera del modal (light-dismiss)
+  if (dom.loginModal) {
+    dom.loginModal.addEventListener('click', (event) => {
+      if (event.target !== dom.loginModal) return;
+      const rect = dom.loginModal.getBoundingClientRect();
+      const isDialogContent = (
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width
+      );
+      if (!isDialogContent) {
+        dom.loginModal.close();
+        resetLoginModal();
+      }
+    });
+  }
+
+  // Procesar envío de Magic Link
+  if (dom.loginForm) {
+    dom.loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = dom.loginEmailInput.value.trim();
+      if (!email) return;
+
+      dom.loginLoader.classList.remove('hidden');
+      dom.loginError.classList.add('hidden');
+      dom.loginSuccessMsg.classList.add('hidden');
+      dom.btnLoginSubmit.disabled = true;
+
+      try {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: window.location.origin
+          }
+        });
+
+        if (error) throw error;
+
+        dom.loginSuccessMsg.classList.remove('hidden');
+      } catch (err) {
+        console.error("Login error:", err);
+        dom.loginError.textContent = err.message || "Error al enviar el enlace de acceso.";
+        dom.loginError.classList.remove('hidden');
+      } finally {
+        dom.loginLoader.classList.add('hidden');
+        dom.btnLoginSubmit.disabled = false;
+      }
+    });
+  }
+
+  // Botón de cerrar sesión
+  if (dom.btnLogout) {
+    dom.btnLogout.addEventListener('click', async () => {
+      try {
+        await supabase.auth.signOut();
+        showToast("SESIÓN CERRADA", "Has cerrado sesión correctamente.", "info");
+      } catch (err) {
+        console.error("Logout error:", err);
+        showToast("ERROR", "No se pudo cerrar la sesión.", "danger");
+      }
+    });
+  }
+
+  // Escuchar cambios de estado de autenticación
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    updateAuthUI(session);
+    if (session) {
+      // Sincronizar favoritos remotos y locales
+      await syncUserCalendar(session.user.id);
+    } else {
+      // Usar localStorage si no está autenticado
+      state.userCalendar = JSON.parse(localStorage.getItem('encriptados_calendar')) || [];
+      renderEvents();
+    }
+  });
+}
+
+function resetLoginModal() {
+  if (dom.loginForm) dom.loginForm.reset();
+  if (dom.loginLoader) dom.loginLoader.classList.add('hidden');
+  if (dom.loginError) dom.loginError.classList.add('hidden');
+  if (dom.loginSuccessMsg) dom.loginSuccessMsg.classList.add('hidden');
+  if (dom.btnLoginSubmit) dom.btnLoginSubmit.disabled = false;
+}
+
+function updateAuthUI(session) {
+  if (session) {
+    if (dom.btnLoginTrigger) dom.btnLoginTrigger.classList.add('hidden');
+    if (dom.userProfile) dom.userProfile.classList.remove('hidden');
+    if (dom.userEmailDisplay) dom.userEmailDisplay.textContent = session.user.email;
+  } else {
+    if (dom.btnLoginTrigger) dom.btnLoginTrigger.classList.remove('hidden');
+    if (dom.userProfile) dom.userProfile.classList.add('hidden');
+    if (dom.userEmailDisplay) dom.userEmailDisplay.textContent = '';
+  }
+}
+
+async function syncUserCalendar(userId) {
+  try {
+    // 1. Obtener favoritos del servidor
+    const { data: remoteData, error } = await supabase
+      .from('user_calendar')
+      .select('event_id')
+      .eq('user_id', userId);
+
+    if (error) throw error;
+
+    const remoteIds = remoteData.map(r => Number(r.event_id));
+    
+    // 2. Obtener favoritos de localStorage
+    const localCalendar = JSON.parse(localStorage.getItem('encriptados_calendar')) || [];
+
+    // 3. Combinar ambos conjuntos
+    const mergedSet = new Set([...remoteIds, ...localCalendar]);
+
+    // Insertar localmente en el servidor los que falten
+    const missingRemotely = localCalendar.filter(id => !remoteIds.includes(id));
+    if (missingRemotely.length > 0) {
+      const inserts = missingRemotely.map(id => ({ user_id: userId, event_id: id }));
+      await supabase
+        .from('user_calendar')
+        .upsert(inserts, { onConflict: 'user_id,event_id' });
+    }
+
+    // Actualizar estado y local storage
+    state.userCalendar = Array.from(mergedSet);
+    localStorage.setItem('encriptados_calendar', JSON.stringify(state.userCalendar));
+    
+    // Re-renderizar grilla
+    renderEvents();
+  } catch (err) {
+    console.error("Error al sincronizar favoritos con la nube:", err);
+  }
+}
+
+function initDeepLinking() {
+  const eventId = new URLSearchParams(window.location.search).get('event');
+  if (eventId) {
+    // Buscar en los eventos ya cargados
+    const existing = state.events.find(e => String(e.id) === String(eventId));
+    if (existing) {
+      openEventModal(existing);
+    } else {
+      // Consultar en la base de datos de Supabase si no está en caché
+      if (supabase) {
+        supabase
+          .from('events')
+          .select('*')
+          .eq('id', eventId)
+          .single()
+          .then(({ data, error }) => {
+            if (!error && data) {
+              const formattedEvent = {
+                id: data.id,
+                title: data.title,
+                event_date: data.event_date,
+                time: data.time_range,
+                location_type: data.location_type,
+                location_detail: data.location_detail,
+                location_city: data.location_city,
+                cover_url: data.cover_url,
+                host_name: data.host_name,
+                price_info: data.price_info,
+                luma_url: data.luma_url,
+                original_timezone: data.original_timezone,
+                original_time_range: data.original_time_range
+              };
+              // Agregar al estado si no está presente
+              if (!state.events.some(e => e.id === formattedEvent.id)) {
+                state.events.push(formattedEvent);
+              }
+              openEventModal(formattedEvent);
+            } else if (error) {
+              console.error("Error cargando evento por deep link:", error.message);
+            }
+          });
+      }
+    }
+  }
 }
 
 // Arrancar cuando el DOM esté listo

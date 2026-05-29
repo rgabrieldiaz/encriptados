@@ -2544,4 +2544,97 @@ dialog[open] {
   box-shadow: 0 0 8px #ffffff, 0 0 15px var(--neon-purple);
 }
 
+/* ==========================================================================
+   NUEVOS ESTILOS: AUTENTICACIÓN, COMPARTIR Y ZONAS HORARIAS
+   ========================================================================== */
+
+.auth-controls {
+  display: flex;
+  align-items: center;
+}
+
+.btn-auth {
+  height: 36px;
+  border-color: rgba(138, 43, 226, 0.4);
+}
+
+.btn-auth:hover {
+  border-color: var(--neon-purple);
+  box-shadow: 0 0 15px rgba(138, 43, 226, 0.4), inset 0 0 5px rgba(138, 43, 226, 0.2);
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(14, 14, 25, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 12px;
+  border-radius: 12px;
+  height: 36px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.user-email {
+  font-family: var(--font-geom);
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.5px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all var(--transition-fast);
+}
+
+.btn-logout:hover {
+  color: #ff3b6b;
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 5px rgba(255, 59, 107, 0.6));
+}
+
+.btn-logout svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Warning de Zona Horaria Convertida */
+#modal-timezone-warning {
+  background: rgba(0, 255, 255, 0.04);
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  padding: 4px 10px;
+  border-radius: 6px;
+  gap: 6px;
+  animation: fadeInFilter 0.3s ease;
+  cursor: help;
+}
+
+#modal-timezone-warning span {
+  font-family: var(--font-geom);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  letter-spacing: 0.5px;
+}
+
+#modal-timezone-warning:hover {
+  background: rgba(0, 255, 255, 0.08);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
+}
+
+
 

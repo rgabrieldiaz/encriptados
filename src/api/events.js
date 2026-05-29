@@ -19,15 +19,22 @@ export const supabase = window.supabase
  * @param {string} city Ciudad seleccionada
  * @param {Date} referenceDate Fecha de referencia del calendario
  */
-export async function getEvents(city, referenceDate = new Date()) {
-  // Rango de consulta: +/- 35 días de la fecha de referencia para cubrir vistas mensual y semanal
-  const startDate = new Date(referenceDate);
-  startDate.setDate(startDate.getDate() - 35);
-  const endDate = new Date(referenceDate);
-  endDate.setDate(endDate.getDate() + 35);
+export async function getEvents(city, referenceDate = new Date(), startDateInput = null, endDateInput = null) {
+  let startDateStr, endDateStr;
 
-  const startDateStr = startDate.toISOString().split('T')[0];
-  const endDateStr = endDate.toISOString().split('T')[0];
+  if (startDateInput && endDateInput) {
+    startDateStr = startDateInput;
+    endDateStr = endDateInput;
+  } else {
+    // Rango de consulta por defecto: +/- 35 días de la fecha de referencia
+    const startDate = new Date(referenceDate);
+    startDate.setDate(startDate.getDate() - 35);
+    const endDate = new Date(referenceDate);
+    endDate.setDate(endDate.getDate() + 35);
+
+    startDateStr = startDate.toISOString().split('T')[0];
+    endDateStr = endDate.toISOString().split('T')[0];
+  }
 
   if (supabase) {
     try {
@@ -58,9 +65,11 @@ export async function getEvents(city, referenceDate = new Date()) {
           cover_url: e.cover_url,
           host_name: e.host_name,
           price_info: e.price_info,
-          luma_url: e.luma_url
+          luma_url: e.luma_url,
+          original_timezone: e.original_timezone,
+          original_time_range: e.original_time_range
         }));
-        console.log(`Cargados ${dbEvents.length} eventos reales desde Supabase para ${city}.`);
+        console.log(`Cargados ${dbEvents.length} eventos reales desde Supabase para ${city} en rango [${startDateStr} - ${endDateStr}].`);
         return dbEvents;
       }
     } catch (err) {

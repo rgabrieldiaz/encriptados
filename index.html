@@ -45,6 +45,27 @@
               <span>Sugerir Evento</span>
             </button>
 
+            <!-- Controles de Autenticación -->
+            <div class="auth-controls" id="auth-controls">
+              <button class="btn-auth btn-suggest-trigger" id="btn-login-trigger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-user" style="width: 14px; height: 14px; color: var(--neon-purple); margin-right: 6px;">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Ingresar</span>
+              </button>
+              <div class="user-profile hidden" id="user-profile">
+                <span class="user-email" id="user-email-display">usuario@mail.com</span>
+                <button class="btn-logout" id="btn-logout" title="Cerrar Sesión">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-logout">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
             <!-- Selector de Ubicación -->
             <div class="location-selector" id="location-selector">
               <div class="location-current">
@@ -236,6 +257,14 @@
               </svg>
               <span id="modal-time">19:00 - 22:00 hs</span>
             </div>
+            <div class="meta-item hidden" id="modal-timezone-warning">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--neon-cyan);">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span id="modal-timezone-text">Convertido de UTC</span>
+            </div>
             <div class="meta-item">
               <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -284,6 +313,15 @@
             <button class="action-btn icon-only-btn" id="modal-bookmark-btn" title="Guardar en favoritos">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </button>
+            <button class="action-btn icon-only-btn" id="modal-share-btn" title="Compartir evento">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"></circle>
+                <circle cx="6" cy="12" r="3"></circle>
+                <circle cx="18" cy="19" r="3"></circle>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
               </svg>
             </button>
           </div>
@@ -371,6 +409,42 @@
           </div>
         </div>
 
+      </div>
+    </div>
+  </dialog>
+
+  <!-- MODAL DE INICIO DE SESIÓN (Magic Link) -->
+  <dialog id="login-modal" class="suggest-modal-dialog" closedby="any" aria-labelledby="login-modal-title">
+    <div class="modal-card suggest-modal-card" style="max-width: 420px; margin: auto;">
+      <button class="modal-close-btn" id="login-close-btn" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      
+      <div class="modal-content">
+        <h2 class="modal-title" id="login-modal-title" style="margin-bottom: 8px;">Iniciar Sesión</h2>
+        <p class="modal-subtitle">Ingresa tu email para recibir un enlace de acceso rápido sin contraseña (Magic Link).</p>
+        
+        <form id="login-form" class="suggest-form">
+          <div class="input-group" style="display: flex; flex-direction: column; gap: 12px;">
+            <input type="email" id="login-email-input" placeholder="tu@email.com" required autocomplete="email" style="width: 100%; box-sizing: border-box;" />
+            <button type="submit" class="btn-primary" id="btn-login-submit" style="width: 100%;">
+              <span>Enviar Enlace Mágico</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Mensajes de estado -->
+        <div class="suggest-error hidden" id="login-error"></div>
+        <div class="suggest-loader hidden" id="login-loader">
+          <div class="cyber-spinner"></div>
+          <p id="login-loader-text">Enviando email de acceso...</p>
+        </div>
+        <div id="login-success-msg" class="hidden" style="background: rgba(0, 255, 135, 0.1); border: 1px solid rgba(0, 255, 135, 0.3); color: #00ff87; padding: 12px 16px; border-radius: 8px; font-size: 13px; text-align: center; margin-top: 10px;">
+          ¡Enlace enviado! Revisa tu correo (bandeja de entrada y spam) para ingresar.
+        </div>
       </div>
     </div>
   </dialog>
