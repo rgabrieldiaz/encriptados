@@ -518,11 +518,12 @@ function renderEvents() {
       positionedEvents.forEach(item => {
         const card = createEventCard(item.event);
         
-        // Inyectar variables de posicionamiento CSS
+        // Inyectar variables de posicionamiento CSS y atributos de datos
         card.style.setProperty('--start-hour', item.start);
         card.style.setProperty('--duration', item.duration);
         card.style.setProperty('--col-index', item.colIndex);
         card.style.setProperty('--total-cols', item.totalCols);
+        card.dataset.cols = item.totalCols;
 
         wrapper.appendChild(card);
       });

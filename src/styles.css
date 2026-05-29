@@ -2148,7 +2148,7 @@ dialog[open] {
 /* Vista Diaria - Agenda Horaria y Solapamientos */
 .calendar-grid.view-diario {
   grid-template-columns: 1fr;
-  max-width: 100%; /* Aprovechar el ancho completo */
+  max-width: 900px; /* Ancho equilibrado para soportar solapamientos de forma legible */
   margin: 0 auto;
   min-height: auto;
 }
@@ -2239,13 +2239,18 @@ dialog[open] {
   height: calc(var(--duration) * var(--hour-height) - 4px);
   left: calc(var(--col-index) * (100% / var(--total-cols)) + 2px);
   width: calc((100% / var(--total-cols)) - 4px);
-  /* Eliminado max-width de 280px para aprovechar el ancho completo disponible */
+  max-width: 100%;
   margin: 0 !important;
   padding: 10px 12px !important;
   gap: 4px !important;
   overflow: hidden;
   z-index: 5;
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), z-index 0.1s;
+}
+
+/* Limitar el ancho máximo a 380px sólo cuando no hay solapamientos */
+.calendar-grid.view-diario .event-card[data-cols="1"] {
+  max-width: 380px;
 }
 
 /* Resaltado de tarjetas en hover para solapamientos */
