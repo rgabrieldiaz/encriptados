@@ -770,7 +770,7 @@ body {
 
 /* Estado de columna vacía */
 .events-wrapper:empty::after {
-  content: "NO EVENTS";
+  content: "SIN EVENTOS HOY";
   font-family: var(--font-geom);
   font-size: 8px;
   font-weight: 700;
