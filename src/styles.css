@@ -2239,18 +2239,13 @@ dialog[open] {
   height: calc(var(--duration) * var(--hour-height) - 4px);
   left: calc(var(--col-index) * (100% / var(--total-cols)) + 2px);
   width: calc((100% / var(--total-cols)) - 4px);
-  max-width: 100%;
+  max-width: 280px; /* Ancho máximo estilizado para mantener las tarjetas compactas */
   margin: 0 !important;
   padding: 10px 12px !important;
   gap: 4px !important;
   overflow: hidden;
   z-index: 5;
   transition: transform var(--transition-normal), box-shadow var(--transition-normal), z-index 0.1s;
-}
-
-/* Limitar el ancho máximo a 380px sólo cuando no hay solapamientos */
-.calendar-grid.view-diario .event-card[data-cols="1"] {
-  max-width: 380px;
 }
 
 /* Resaltado de tarjetas en hover para solapamientos */
