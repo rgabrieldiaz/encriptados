@@ -213,76 +213,80 @@
           <line x1="6" y1="6" x2="18" y2="18"></line>
         </svg>
       </button>
-      <div class="modal-content">
-        <div class="modal-cover-container hidden" id="modal-cover-container">
-          <img class="modal-cover-img" id="modal-cover-img" src="" alt="Flyer del evento" />
+      <div class="modal-content modal-detail-layout">
+        <div class="modal-col-left">
+          <div class="modal-header-tags" id="modal-tags">
+            <!-- Tags dinámicos -->
+          </div>
+          <h2 class="modal-title" id="modal-title">Título del Evento</h2>
+          <div class="modal-meta-grid">
+            <div class="meta-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span id="modal-date">Lunes, 25 de Mayo</span>
+            </div>
+            <div class="meta-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span id="modal-time">19:00 - 22:00 hs</span>
+            </div>
+            <div class="meta-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <span id="modal-location">Palermo, CABA</span>
+            </div>
+            <div class="meta-item hidden" id="modal-host-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span id="modal-host">Host</span>
+            </div>
+            <div class="meta-item hidden" id="modal-price-item">
+              <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+              </svg>
+              <span id="modal-price">Precio</span>
+            </div>
+          </div>
+          <p class="modal-description" id="modal-description">Descripción detallada del evento...</p>
+          <div class="modal-actions">
+            <a class="action-btn luma-btn" id="modal-luma-link" href="#" target="_blank">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              <span>Ir a evento</span>
+            </a>
+            <button class="action-btn icon-only-btn" id="modal-add-btn" title="Añadir al calendario">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </button>
+            <button class="action-btn icon-only-btn" id="modal-bookmark-btn" title="Guardar en favoritos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="modal-header-tags" id="modal-tags">
-          <!-- Tags dinámicos -->
-        </div>
-        <h2 class="modal-title" id="modal-title">Título del Evento</h2>
-        <div class="modal-meta-grid">
-          <div class="meta-item">
-            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-            <span id="modal-date">Lunes, 25 de Mayo</span>
+        <div class="modal-col-right">
+          <div class="modal-cover-container hidden" id="modal-cover-container">
+            <img class="modal-cover-img" id="modal-cover-img" src="" alt="Flyer del evento" />
           </div>
-          <div class="meta-item">
-            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-            <span id="modal-time">19:00 - 22:00 hs</span>
-          </div>
-          <div class="meta-item">
-            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <span id="modal-location">Palermo, CABA</span>
-          </div>
-          <div class="meta-item hidden" id="modal-host-item">
-            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            <span id="modal-host">Host</span>
-          </div>
-          <div class="meta-item hidden" id="modal-price-item">
-            <svg class="meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-              <line x1="7" y1="7" x2="7.01" y2="7"></line>
-            </svg>
-            <span id="modal-price">Precio</span>
-          </div>
-        </div>
-        <p class="modal-description" id="modal-description">Descripción detallada del evento...</p>
-        <div class="modal-actions">
-          <a class="action-btn luma-btn" id="modal-luma-link" href="#" target="_blank">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-            <span>Ir a evento</span>
-          </a>
-          <button class="action-btn icon-only-btn" id="modal-add-btn" title="Añadir al calendario">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-          </button>
-          <button class="action-btn icon-only-btn" id="modal-bookmark-btn" title="Guardar en favoritos">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-            </svg>
-          </button>
         </div>
       </div>
     </div>
