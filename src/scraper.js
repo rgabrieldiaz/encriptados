@@ -187,7 +187,20 @@ export async function scrapeSingleLumaEvent(url, defaultCity = 'AMBA') {
     const pageText = $('body').text() || '';
 
     const title = rawEvent?.name || pageTitle;
-    const description = rawEvent?.description || pageText.slice(0, 3000);
+    
+    // Obtener la descripción priorizando el div content dentro de event-about-card o spark-content
+    let contentText = $('.event-about-card .content').text().trim();
+    if (!contentText) {
+      contentText = $('.event-about-card').text().replace(/^About Event/i, '').trim();
+    }
+    if (!contentText) {
+      contentText = $('.spark-content').text().trim();
+    }
+    if (!contentText) {
+      contentText = $('.content').text().trim();
+    }
+    const description = contentText || rawEvent?.description || pageText.slice(0, 3000);
+
     const rawLocation = rawEvent?.location?.address || 
                         rawEvent?.location?.name || 
                         rawEvent?.geo_address_info?.full_address || 
@@ -201,7 +214,79 @@ export async function scrapeSingleLumaEvent(url, defaultCity = 'AMBA') {
                  $('meta[name="twitter:image"]').attr('content') || 
                  '';
     }
-    const hostName = eventContainer?.calendar?.name || eventContainer?.hosts?.[0]?.name || '';
+    
+    // Extracción de hosts desde el div que contiene la clase hosts, con fallback a NEXT_DATA
+    let hostNames = [];
+    const htmlHosts = [];
+    
+    // Primero intentamos buscar los elementos con la clase .host-row dentro de .hosts (para organizadores individuales)
+    const hostRowElements = $('.hosts .host-row');
+    if (hostRowElements.length > 0) {
+      hostRowElements.each((_, el) => {
+        let name = $(el).find('.fw-medium, .text-ellipses, [class*="name"]').first().text().trim();
+        if (!name) {
+          name = $(el).text().trim();
+        }
+        if (name && name.length > 2 && name.length < 100) {
+          const lower = name.toLowerCase();
+          if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
+            htmlHosts.push(name);
+          }
+        }
+      });
+    }
+
+    // Fallback: si no se encontraron elementos con .host-row, buscamos cualquier enlace o elemento de texto dentro de .hosts
+    if (htmlHosts.length === 0) {
+      $('.hosts').each((_, hostsContainer) => {
+        const links = $(hostsContainer).find('a');
+        if (links.length > 0) {
+          links.each((_, link) => {
+            let name = $(link).find('.text-ellipses, .fw-medium, [class*="name"]').first().text().trim();
+            if (!name) {
+              name = $(link).text().trim();
+            }
+            if (name && name.length > 2 && name.length < 100) {
+              const lower = name.toLowerCase();
+              if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
+                htmlHosts.push(name);
+              }
+            }
+          });
+        } else {
+          $(hostsContainer).find('.text-ellipses, .fw-medium, span, h3, h4').each((_, textEl) => {
+            const name = $(textEl).text().trim();
+            if (name && name.length > 2 && name.length < 100) {
+              const lower = name.toLowerCase();
+              if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
+                htmlHosts.push(name);
+              }
+            }
+          });
+        }
+      });
+    }
+
+    if (htmlHosts.length > 0) {
+      hostNames = htmlHosts;
+    } else {
+      if (eventContainer?.hosts && Array.isArray(eventContainer.hosts)) {
+        hostNames = eventContainer.hosts.map(h => h.name).filter(Boolean);
+      } else if (eventContainer?.calendar?.name) {
+        hostNames = [eventContainer.calendar.name];
+      }
+    }
+
+    let hostName = '';
+    if (hostNames.length > 0) {
+      if (hostNames.length === 1) {
+        hostName = hostNames[0];
+      } else if (hostNames.length === 2) {
+        hostName = hostNames.join(' y ');
+      } else {
+        hostName = hostNames.slice(0, -1).join(', ') + ' y ' + hostNames[hostNames.length - 1];
+      }
+    }
     
     const ticketInfo = eventContainer?.ticket_info;
     let priceStr = 'Gratis';

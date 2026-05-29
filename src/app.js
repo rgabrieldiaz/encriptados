@@ -91,6 +91,7 @@ const dom = {
   modalLocation: document.getElementById('modal-location'),
   modalDescription: document.getElementById('modal-description'),
   modalAddBtn: document.getElementById('modal-add-btn'),
+  modalBookmarkBtn: document.getElementById('modal-bookmark-btn'),
   toastContainer: document.getElementById('toast-container'),
   canvas: document.getElementById('space-canvas'),
   
@@ -1294,8 +1295,9 @@ function syncAllButtonsForEvent(eventId) {
   });
   
   // Sincronizar botón del modal si está abierto
-  if (currentActiveModalEventId === eventId && dom.modalAddBtn) {
-    updateButtonVisualState(dom.modalAddBtn, isAdded);
+  if (currentActiveModalEventId === eventId) {
+    if (dom.modalAddBtn) updateButtonVisualState(dom.modalAddBtn, isAdded);
+    if (dom.modalBookmarkBtn) updateBookmarkButtonVisualState(dom.modalBookmarkBtn, isAdded);
   }
 }
 
@@ -1305,34 +1307,75 @@ function syncAllButtonsForEvent(eventId) {
 function updateButtonVisualState(buttonElement, isAdded) {
   if (!buttonElement) return;
   const isModalBtn = buttonElement.id === 'modal-add-btn';
-  const textAdd = isModalBtn ? 'Añadir' : 'Añadir al calendario';
-  const textAdded = isModalBtn ? 'Guardado' : 'En mi calendario';
 
-  if (isAdded) {
-    buttonElement.innerHTML = `
-      <span>${textAdded}</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-    `;
-    buttonElement.classList.add('added');
+  if (isModalBtn) {
+    // Para el modal, el botón es icon-only
+    if (isAdded) {
+      buttonElement.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      `;
+      buttonElement.classList.add('added');
+    } else {
+      buttonElement.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+      `;
+      buttonElement.classList.remove('added');
+    }
   } else {
-    buttonElement.innerHTML = `
-      <span>${textAdd}</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    `;
-    buttonElement.classList.remove('added');
+    // Para las tarjetas
+    const textAdd = 'Añadir al calendario';
+    const textAdded = 'En mi calendario';
+
+    if (isAdded) {
+      buttonElement.innerHTML = `
+        <span>${textAdded}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      `;
+      buttonElement.classList.add('added');
+    } else {
+      buttonElement.innerHTML = `
+        <span>${textAdd}</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; margin-left: 6px;">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      `;
+      buttonElement.classList.remove('added');
+    }
   }
+  
   // Limpiar estilos en línea previos
   buttonElement.style.background = '';
   buttonElement.style.borderColor = '';
   buttonElement.style.color = '';
   buttonElement.style.boxShadow = '';
+}
+
+/**
+ * Actualiza el estado y diseño visual del botón de bookmark del modal.
+ */
+function updateBookmarkButtonVisualState(btn, isActive) {
+  if (!btn) return;
+  if (isActive) {
+    btn.classList.add('active');
+    const svg = btn.querySelector('svg');
+    if (svg) svg.setAttribute('fill', 'currentColor');
+  } else {
+    btn.classList.remove('active');
+    const svg = btn.querySelector('svg');
+    if (svg) svg.setAttribute('fill', 'none');
+  }
 }
 
 /**
@@ -1662,12 +1705,21 @@ function openEventModal(event) {
   // Actualizar botón de acción del modal
   const isAdded = state.userCalendar.includes(event.id);
   updateButtonVisualState(dom.modalAddBtn, isAdded);
+  updateBookmarkButtonVisualState(dom.modalBookmarkBtn, isAdded);
 
   // Quitar listener anterior y añadir el nuevo para abrir el dropdown al hacer click
   dom.modalAddBtn.onclick = (e) => {
     e.stopPropagation();
     openDropdownMenu(e, event, dom.modalAddBtn);
   };
+
+  // Quitar listener anterior y añadir el nuevo para guardar/bookmarkear en el modal
+  if (dom.modalBookmarkBtn) {
+    dom.modalBookmarkBtn.onclick = (e) => {
+      e.stopPropagation();
+      toggleCalendarEvent(event, dom.modalAddBtn);
+    };
+  }
 
   // Abrir modal con animación
   dom.eventModal.classList.add('open');

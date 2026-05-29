@@ -1193,7 +1193,7 @@ body {
 
 /* Lu.ma branded orange/red gradient button */
 .modal-actions .luma-btn {
-  flex: 1.5;
+  flex: 1;
   background: linear-gradient(135deg, #ff4e50 0%, #f9d423 100%);
   box-shadow: 0 4px 15px rgba(255, 78, 80, 0.25);
   text-decoration: none;
@@ -1203,26 +1203,36 @@ body {
   box-shadow: 0 6px 20px rgba(255, 78, 80, 0.45);
 }
 
-/* Smaller, secondary calendar add button in modal */
-.modal-actions #modal-add-btn {
-  flex: 1.2;
+/* Premium icon-only buttons in modal (calendar and bookmark) */
+.modal-actions .icon-only-btn {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.8);
   box-shadow: none;
-  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
 }
 
-.modal-actions #modal-add-btn:hover {
+.modal-actions .icon-only-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  transform: scale(1.05);
 }
 
-.modal-actions #modal-add-btn.added {
-  background: linear-gradient(135deg, rgba(0, 255, 135, 0.15) 0%, rgba(96, 239, 255, 0.15) 100%);
+.modal-actions .icon-only-btn.active,
+.modal-actions .icon-only-btn.added {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.25) 0%, rgba(0, 255, 255, 0.25) 100%);
   border-color: var(--neon-cyan);
   color: var(--neon-cyan);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.15);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.25);
 }
 
 /* Suggest Confirmation Layout */
