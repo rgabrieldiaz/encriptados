@@ -644,15 +644,15 @@ serve(async (req) => {
         global: { headers: { Authorization: authHeader } }
       });
 
-      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      const { data, error: authError } = await userClient.auth.getUser();
 
-      if (authError || !user || user.email !== 'gabrieldiaz81@gmail.com') {
+      if (authError || !data?.user || data.user.email !== 'gabrieldiaz81@gmail.com') {
         return new Response(
           JSON.stringify({ error: "No autorizado. Solo el administrador puede correr los exploradores." }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      userEmail = user.email;
+      userEmail = data.user.email;
     }
 
     // 2. Registrar el inicio de la ejecución
