@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-bypass',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -139,28 +139,47 @@ serve(async (req) => {
         </html>
       `;
     } else {
-      // 1. Fetch de la página de Lu.ma con UA rotado
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': getRandomUserAgent()
-        }
-      });
+      // 1. Fetch de la página de Lu.ma con UA rotado e implementando timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 seconds timeout
 
-      if (!response.ok || response.status === 403 || response.status === 429) {
-        const isBlock = response.status === 403 || response.status === 429;
-        return new Response(
-          JSON.stringify({ 
-            error: isBlock ? "blocking" : `HTTP_${response.status}`,
-            message: isBlock 
-              ? "El origen de datos está bloqueando temporalmente la lectura (Rate Limit / Cloudflare). Por favor, intenta sugerir este enlace en unos minutos."
-              : `No se pudo acceder a la URL de Luma. Código: ${response.status}`
-          }),
-          { status: response.status === 429 ? 429 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': getRandomUserAgent()
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok || response.status === 403 || response.status === 429) {
+          const isBlock = response.status === 403 || response.status === 429;
+          return new Response(
+            JSON.stringify({ 
+              error: isBlock ? "blocking" : `HTTP_${response.status}`,
+              message: isBlock 
+                ? "El origen de datos está bloqueando temporalmente la lectura (Rate Limit / Cloudflare). Por favor, intenta sugerir este enlace en unos minutos."
+                : `No se pudo acceder a la URL de Luma. Código: ${response.status}`
+            }),
+            { status: response.status === 429 ? 429 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        html = await response.text();
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          return new Response(
+            JSON.stringify({ 
+              error: "timeout", 
+              message: "El servidor de Lu.ma tardó demasiado en responder. Por favor, intenta de nuevo." 
+            }),
+            { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        throw fetchErr;
       }
 
-      html = await response.text();
-      
       // Detectar bloqueos ocultos de Cloudflare
       if (html.includes('cf-challenge') || html.includes('cloudflare') || html.includes('captcha')) {
         return new Response(
@@ -173,14 +192,14 @@ serve(async (req) => {
       }
     }
     
-    // 2. Extraer __NEXT_DATA__
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    // 2. Extraer __NEXT_DATA__ y fallbacks de HTML usando Cheerio (seguro contra backtracking de RegExp)
+    const $ = cheerio.load(html);
+    const nextDataStr = $('#__NEXT_DATA__').html();
     let eventContainer = null;
 
-    if (nextDataMatch) {
+    if (nextDataStr) {
       try {
-        const nextData = JSON.parse(nextDataMatch[1]);
-        eventContainer = findEventContainer(nextData);
+        eventContainer = findEventContainer(JSON.parse(nextDataStr));
       } catch (err) {
         console.warn("Error parseando __NEXT_DATA__ JSON:", err);
       }
@@ -188,17 +207,9 @@ serve(async (req) => {
 
     const rawEvent = eventContainer?.api_event || eventContainer?.event;
 
-    // Load HTML with Cheerio
-    const $ = cheerio.load(html);
-
-    // Fallbacks
-    const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/);
-    const pageTitle = titleMatch ? titleMatch[1].trim() : 'Evento de Luma';
-    
-    const bodyMatch = html.match(/<body[\s\S]*?>([\s\S]*?)<\/body>/);
-    const bodyText = bodyMatch 
-      ? bodyMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 3000) 
-      : '';
+    // Fallbacks limpios basados en Cheerio
+    const pageTitle = $('title').text().trim() || 'Evento de Luma';
+    const bodyText = $('body').text().replace(/\s+/g, ' ').slice(0, 3000) || '';
 
     const title = rawEvent?.name || pageTitle;
     
@@ -224,17 +235,9 @@ serve(async (req) => {
     // 3. Extracción de Flyer, Host, y Precio
     let coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
     if (!coverUrl) {
-      const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-      if (ogMatch) {
-        coverUrl = ogMatch[1];
-      } else {
-        const twitterMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i) ||
-                             html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
-        if (twitterMatch) {
-          coverUrl = twitterMatch[1];
-        }
-      }
+      coverUrl = $('meta[property="og:image"]').attr('content') || 
+                 $('meta[name="twitter:image"]').attr('content') || 
+                 '';
     }
 
     // Extracción de hosts
@@ -482,39 +485,56 @@ Reglas críticas:
 6. Devuelve únicamente el objeto JSON bien formado sin rodeos de texto ni markdown.`;
 
     const userPrompt = `URL: ${url}
-Título extraído: ${title}
-Descripción extraída: ${description.slice(0, 1500)}
-Ubicación cruda: ${rawLocation}
-Ubicación Privada: ${isAddressPrivate ? 'Sí' : 'No'}
-Fecha local precalculada: ${localDate}
-Día de la semana precalculado: ${localDayOfWeek}
-Rango horario precalculado: ${localTimeRange}`;
+    Título extraído: ${title}
+    Descripción extraída: ${(description || '').slice(0, 1500)}
+    Ubicación cruda: ${rawLocation}
+    Ubicación Privada: ${isAddressPrivate ? 'Sí' : 'No'}
+    Fecha local precalculada: ${localDate}
+    Día de la semana precalculado: ${localDayOfWeek}
+    Rango horario precalculado: ${localTimeRange}`;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: userPrompt }
-            ]
-          }
-        ],
-        systemInstruction: {
-          parts: [
-            { text: systemPrompt }
-          ]
+    const geminiController = new AbortController();
+    const geminiTimeoutId = setTimeout(() => geminiController.abort(), 15000); // 15 seconds timeout
+
+    let geminiRes;
+    try {
+      geminiRes = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         },
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
-      })
-    });
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: userPrompt }
+              ]
+            }
+          ],
+          systemInstruction: {
+            parts: [
+              { text: systemPrompt }
+            ]
+          },
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        }),
+        signal: geminiController.signal
+      });
+    } catch (geminiErr: any) {
+      if (geminiErr.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ error: "Error de Gemini: La API de IA no respondió a tiempo." }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw geminiErr;
+    } finally {
+      clearTimeout(geminiTimeoutId);
+    }
 
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
