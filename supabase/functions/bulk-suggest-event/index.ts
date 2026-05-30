@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as cheerio from "https://esm.sh/cheerio@1.0.0-rc.12";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 
 const corsHeaders = {
@@ -7,16 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-bypass',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
-// Rotación de User-Agents
-const userAgents = [
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-];
-const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgents.length)];
 
 // Algoritmo de distancia de Levenshtein para similitud de strings (Fuzzy Matching)
 function getLevenshteinDistance(a: string, b: string): number {
@@ -48,19 +37,40 @@ function getSimilarity(s1: string, s2: string): number {
   return (longer.length - getLevenshteinDistance(longer, shorter)) / longer.length;
 }
 
-// Buscar recursivamente el contenedor de evento en NEXT_DATA
-function findEventContainer(obj: any): any {
-  if (!obj || typeof obj !== 'object') return null;
-  if ((obj.api_event && obj.api_event.name) || (obj.event && obj.event.name && obj.event.start_at)) {
-    return obj;
+// Extraer el slug de una URL de Luma
+function extractLumaSlug(rawUrl: string): string | null {
+  try {
+    let normalized = rawUrl.trim();
+    if (!normalized.startsWith('http')) normalized = `https://${normalized}`;
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.replace('www.', '');
+    if (host !== 'lu.ma' && host !== 'luma.com') return null;
+    const slug = parsed.pathname.replace(/^\/+|\/+$/g, '');
+    if (!slug || slug === 'discover' || slug === 'pricing' || slug === 'app') return null;
+    return slug;
+  } catch {
+    return null;
   }
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const result = findEventContainer(obj[key]);
-      if (result) return result;
+}
+
+// Extraer texto plano de description_mirror (TipTap/ProseMirror JSON)
+function extractPlainText(mirror: any): string {
+  if (!mirror || typeof mirror !== 'object') return '';
+  let text = '';
+  if (mirror.text) text += mirror.text;
+  if (mirror.content && Array.isArray(mirror.content)) {
+    for (const child of mirror.content) {
+      const childText = extractPlainText(child);
+      if (childText) {
+        if (child.type === 'paragraph' || child.type === 'heading' || child.type === 'horizontal_rule' || child.type === 'list_item' || child.type === 'bullet_list' || child.type === 'ordered_list') {
+          text += (text ? '\n' : '') + childText;
+        } else {
+          text += childText;
+        }
+      }
     }
   }
-  return null;
+  return text;
 }
 
 // Procesador concurrente con límite de workers
@@ -128,158 +138,56 @@ async function processSingleEvent(
       };
     }
 
-    // 2. Fetch de HTML
-    let html = '';
-    if (url.includes('clawconbuenosaires')) {
-      console.log(`[Mock] Usando datos de prueba para ${url}`);
-      const mockNextData = {
-        props: {
-          pageProps: {
-            initialData: {
-              event: {
-                api_id: "evt-hzUoXaqrkOv1LaH",
-                cover_url: "https://images.lumacdn.com/event-covers/rg/6caccfa2-9012-495a-bc83-006f71a11a2c.jpg",
-                end_at: "2026-05-28T23:00:00.000Z",
-                event_type: "independent",
-                location_type: "offline",
-                name: "ClawCon Buenos Aires",
-                start_at: "2026-05-28T21:00:00.000Z",
-                timezone: "America/Argentina/Buenos_Aires",
-                url: "clawconbuenosaires",
-                geo_address_info: {
-                  full_address: "Workplace by IRSA, Vedia 3892, Buenos Aires, Argentina"
-                },
-                geo_address_visibility: "public"
-              },
-              hosts: [{ name: "Tommy" }],
-              ticket_info: { is_free: true }
-            }
-          }
-        }
-      };
-
-      html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>ClawCon Buenos Aires</title>
-          <meta property="og:image" content="https://images.lumacdn.com/event-covers/rg/6caccfa2-9012-495a-bc83-006f71a11a2c.jpg">
-        </head>
-        <body>
-          <div class="hosts"><div class="host-row"><span class="fw-medium">Tommy</span></div></div>
-          <div class="event-about-card"><div class="content">Un evento increíble sobre Inteligencia Artificial y agentes en Buenos Aires.</div></div>
-          <script id="__NEXT_DATA__" type="application/json">${JSON.stringify(mockNextData)}</script>
-        </body>
-        </html>
-      `;
-    } else {
-      const response = await fetch(url, {
-        headers: { 'User-Agent': getRandomUserAgent() }
-      });
-
-      if (!response.ok || response.status === 403 || response.status === 429) {
-        const isBlock = response.status === 403 || response.status === 429;
-        return {
-          url,
-          status: 'error',
-          error: 'blocking',
-          message: isBlock 
-            ? "El origen de datos está bloqueando temporalmente la lectura (Cloudflare/Rate limit)."
-            : `No se pudo acceder. Código: ${response.status}`
-        };
-      }
-
-      html = await response.text();
-
-      if (html.includes('cf-challenge') || html.includes('cloudflare') || html.includes('captcha')) {
-        return {
-          url,
-          status: 'error',
-          error: 'blocking',
-          message: "El origen de datos está bloqueando temporalmente la lectura (Cloudflare/Rate limit)."
-        };
-      }
+    // 2. Obtener datos via API pública de Luma (sin scraping HTML)
+    const slug = extractLumaSlug(url);
+    if (!slug) {
+      return { url, status: 'error', error: 'invalid_url', message: "URL de Luma no válida." };
     }
 
-    // 3. Extraer metadatos
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    let eventContainer = null;
-    if (nextDataMatch) {
-      try {
-        const nextData = JSON.parse(nextDataMatch[1]);
-        eventContainer = findEventContainer(nextData);
-      } catch {
-        console.warn(`Error parseando NEXT_DATA para ${url}`);
-      }
+    const apiUrl = `https://api.lu.ma/url?url=${encodeURIComponent(slug)}`;
+    const response = await fetch(apiUrl, {
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (!response.ok) {
+      const sc = response.status;
+      if (sc === 404) return { url, status: 'error', error: 'not_found', message: "No se encontró evento en Lu.ma." };
+      if (sc === 429 || sc === 403) return { url, status: 'error', error: 'blocking', message: "API de Lu.ma temporalmente limitada." };
+      return { url, status: 'error', error: 'api_error', message: `Error HTTP ${sc} de Lu.ma.` };
     }
 
-    const rawEvent = eventContainer?.api_event || eventContainer?.event;
-    const $ = cheerio.load(html);
-
-    // Fallbacks
-    const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/);
-    const pageTitle = titleMatch ? titleMatch[1].trim() : 'Evento de Luma';
-    const bodyMatch = html.match(/<body[\s\S]*?>([\s\S]*?)<\/body>/);
-    const bodyText = bodyMatch ? bodyMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 3000) : '';
-
-    const title = rawEvent?.name || pageTitle;
-
-    let contentText = $('.event-about-card .content').text().trim();
-    if (!contentText) contentText = $('.event-about-card').text().replace(/^About Event/i, '').trim();
-    if (!contentText) contentText = $('.spark-content').text().trim();
-    if (!contentText) contentText = $('.content').text().trim();
-    const description = contentText || rawEvent?.description || bodyText;
-
-    const rawLocation = rawEvent?.location?.address || rawEvent?.location?.name || rawEvent?.geo_address_info?.full_address || rawEvent?.geo_address_info?.address || 'Virtual';
-
-    let coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
-    if (!coverUrl) {
-      const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                      html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-      coverUrl = ogMatch ? ogMatch[1] : '';
+    const apiData = await response.json();
+    const eventContainer = apiData?.data;
+    if (!eventContainer) {
+      return { url, status: 'error', error: 'parse_error', message: "No se pudo interpretar la respuesta de Lu.ma." };
     }
 
-    // Host
+    const rawEvent = eventContainer.event;
+
+    // 3. Extraer datos directamente del JSON
+    const title = rawEvent?.name || 'Evento de Luma';
+
+    let description = '';
+    if (eventContainer.description_mirror) {
+      description = extractPlainText(eventContainer.description_mirror);
+    }
+    if (!description && rawEvent?.description) description = rawEvent.description;
+    if (!description) description = title;
+
+    const rawLocation = rawEvent?.geo_address_info?.full_address ||
+                        rawEvent?.geo_address_info?.address ||
+                        rawEvent?.geo_address_info?.short_address ||
+                        (rawEvent?.location_type === 'online' ? 'Virtual' : 'Virtual');
+
+    const coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url ||
+                     eventContainer?.social_image?.cdn_url || '';
+
+    // Hosts
     let hostNames: string[] = [];
-    const htmlHosts: string[] = [];
-    const hostRowElements = $('.hosts .host-row');
-    if (hostRowElements.length > 0) {
-      hostRowElements.each((_, el) => {
-        let name = $(el).find('.fw-medium, .text-ellipses, [class*="name"]').first().text().trim();
-        if (!name) name = $(el).text().trim();
-        if (name && name.length > 2 && name.length < 100) {
-          const lower = name.toLowerCase();
-          if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
-            htmlHosts.push(name);
-          }
-        }
-      });
-    }
-    if (htmlHosts.length === 0) {
-      $('.hosts').each((_, hostsContainer) => {
-        const links = $(hostsContainer).find('a');
-        if (links.length > 0) {
-          links.each((_, link) => {
-            let name = $(link).find('.text-ellipses, .fw-medium, [class*="name"]').first().text().trim();
-            if (!name) name = $(link).text().trim();
-            if (name && name.length > 2 && name.length < 100) {
-              const lower = name.toLowerCase();
-              if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
-                htmlHosts.push(name);
-              }
-            }
-          });
-        }
-      });
-    }
-    if (htmlHosts.length > 0) {
-      hostNames = htmlHosts;
-    } else {
-      if (eventContainer?.hosts && Array.isArray(eventContainer.hosts)) {
-        hostNames = eventContainer.hosts.map((h: any) => h.name).filter(Boolean);
-      } else if (eventContainer?.calendar?.name) {
-        hostNames = [eventContainer.calendar.name];
-      }
+    if (eventContainer?.hosts && Array.isArray(eventContainer.hosts)) {
+      hostNames = eventContainer.hosts.map((h: any) => h.name || `${h.first_name || ''} ${h.last_name || ''}`.trim()).filter(Boolean);
+    } else if (eventContainer?.calendar?.name) {
+      hostNames = [eventContainer.calendar.name];
     }
     let hostName = hostNames.length > 0 ? (hostNames.length === 1 ? hostNames[0] : hostNames.length === 2 ? hostNames.join(' y ') : hostNames.slice(0, -1).join(', ') + ' y ' + hostNames[hostNames.length - 1]) : '';
 

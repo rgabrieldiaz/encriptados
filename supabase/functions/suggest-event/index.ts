@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as cheerio from "https://esm.sh/cheerio@1.0.0-rc.12";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 
 const corsHeaders = {
@@ -7,16 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-bypass',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
-// Rotación de User-Agents
-const userAgents = [
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-];
-const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgents.length)];
 
 // Algoritmo de distancia de Levenshtein para similitud de strings (Fuzzy Matching)
 function getLevenshteinDistance(a: string, b: string): number {
@@ -48,21 +37,55 @@ function getSimilarity(s1: string, s2: string): number {
   return (longer.length - getLevenshteinDistance(longer, shorter)) / longer.length;
 }
 
-// Función para buscar recursivamente el contenedor del evento (initialData) en NEXT_DATA
-function findEventContainer(obj: any): any {
-  if (!obj || typeof obj !== 'object') return null;
-  
-  if ((obj.api_event && obj.api_event.name) || (obj.event && obj.event.name && obj.event.start_at)) {
-    return obj;
+// Extraer el slug de una URL de Luma (ej: "https://lu.ma/blitzbuenosaires" -> "blitzbuenosaires")
+function extractLumaSlug(rawUrl: string): string | null {
+  try {
+    // Normalize URL
+    let normalized = rawUrl.trim();
+    if (!normalized.startsWith('http')) {
+      normalized = `https://${normalized}`;
+    }
+    const parsed = new URL(normalized);
+    
+    // Accept lu.ma and luma.com domains
+    const host = parsed.hostname.replace('www.', '');
+    if (host !== 'lu.ma' && host !== 'luma.com') {
+      return null;
+    }
+    
+    // The slug is the path without leading/trailing slashes
+    const slug = parsed.pathname.replace(/^\/+|\/+$/g, '');
+    if (!slug || slug === 'discover' || slug === 'pricing' || slug === 'app') {
+      return null;
+    }
+    
+    return slug;
+  } catch {
+    return null;
   }
-  
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const result = findEventContainer(obj[key]);
-      if (result) return result;
+}
+
+// Extraer texto plano de la description_mirror (TipTap/ProseMirror JSON)
+function extractPlainText(mirror: any): string {
+  if (!mirror || typeof mirror !== 'object') return '';
+  let text = '';
+  if (mirror.text) text += mirror.text;
+  if (mirror.content && Array.isArray(mirror.content)) {
+    for (const child of mirror.content) {
+      const childText = extractPlainText(child);
+      if (childText) {
+        // Add paragraph/heading separator
+        if (child.type === 'paragraph' || child.type === 'heading' || child.type === 'horizontal_rule') {
+          text += (text ? '\n' : '') + childText;
+        } else if (child.type === 'list_item' || child.type === 'bullet_list' || child.type === 'ordered_list') {
+          text += (text ? '\n' : '') + childText;
+        } else {
+          text += childText;
+        }
+      }
     }
   }
-  return null;
+  return text;
 }
 
 serve(async (req) => {
@@ -85,219 +108,101 @@ serve(async (req) => {
 
     console.log(`Procesando sugerencia para URL: ${url}`);
 
-    let html = '';
-    if (url.includes('clawconbuenosaires')) {
-      console.log("Mocking fetch response for clawconbuenosaires event.");
-      const mockNextData = {
-        props: {
-          pageProps: {
-            initialData: {
-              event: {
-                api_id: "evt-hzUoXaqrkOv1LaH",
-                cover_url: "https://images.lumacdn.com/event-covers/rg/6caccfa2-9012-495a-bc83-006f71a11a2c.jpg",
-                end_at: "2026-05-28T23:00:00.000Z",
-                event_type: "independent",
-                location_type: "offline",
-                name: "ClawCon Buenos Aires",
-                start_at: "2026-05-28T21:00:00.000Z",
-                timezone: "America/Argentina/Buenos_Aires",
-                url: "clawconbuenosaires",
-                geo_address_info: {
-                  full_address: "Workplace by IRSA, Vedia 3892, Buenos Aires, Argentina"
-                },
-                geo_address_visibility: "public"
-              },
-              hosts: [
-                { name: "Tommy" }
-              ],
-              ticket_info: {
-                is_free: true
-              }
-            }
-          }
-        }
-      };
+    // 1. Extraer slug y obtener datos via API pública de Luma (no scraping HTML)
+    const slug = extractLumaSlug(url);
+    if (!slug) {
+      return new Response(
+        JSON.stringify({ error: "URL no válida. Por favor, ingresa una URL de evento de Lu.ma (ej: https://lu.ma/mi-evento)" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-      html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>ClawCon Buenos Aires</title>
-          <meta property="og:image" content="https://images.lumacdn.com/event-covers/rg/6caccfa2-9012-495a-bc83-006f71a11a2c.jpg">
-        </head>
-        <body>
-          <div class="hosts">
-            <div class="host-row">
-              <span class="fw-medium">Tommy</span>
-            </div>
-          </div>
-          <div class="event-about-card">
-            <div class="content">Un evento increíble sobre Inteligencia Artificial y agentes en Buenos Aires.</div>
-          </div>
-          <script id="__NEXT_DATA__" type="application/json">${JSON.stringify(mockNextData)}</script>
-        </body>
-        </html>
-      `;
-    } else {
-      // 1. Fetch de la página de Lu.ma con UA rotado e implementando timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 seconds timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 seconds timeout
 
-      try {
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': getRandomUserAgent()
-          },
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+    let apiData: any;
+    try {
+      const apiUrl = `https://api.lu.ma/url?url=${encodeURIComponent(slug)}`;
+      console.log(`Consultando API de Luma: ${apiUrl}`);
+      const response = await fetch(apiUrl, {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
 
-        if (!response.ok || response.status === 403 || response.status === 429) {
-          const isBlock = response.status === 403 || response.status === 429;
+      if (!response.ok) {
+        const statusCode = response.status;
+        if (statusCode === 404) {
           return new Response(
-            JSON.stringify({ 
-              error: isBlock ? "blocking" : `HTTP_${response.status}`,
-              message: isBlock 
-                ? "El origen de datos está bloqueando temporalmente la lectura (Rate Limit / Cloudflare). Por favor, intenta sugerir este enlace en unos minutos."
-                : `No se pudo acceder a la URL de Luma. Código: ${response.status}`
-            }),
-            { status: response.status === 429 ? 429 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ error: "not_found", message: "No se encontró un evento con esa URL en Lu.ma. Verifica que el enlace sea correcto." }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
-        html = await response.text();
-      } catch (fetchErr: any) {
-        clearTimeout(timeoutId);
-        if (fetchErr.name === 'AbortError') {
+        if (statusCode === 429 || statusCode === 403) {
           return new Response(
-            JSON.stringify({ 
-              error: "timeout", 
-              message: "El servidor de Lu.ma tardó demasiado en responder. Por favor, intenta de nuevo." 
-            }),
-            { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ error: "blocking", message: "La API de Lu.ma está temporalmente limitada. Intenta de nuevo en unos minutos." }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        throw fetchErr;
-      }
-
-      // Detectar bloqueos ocultos de Cloudflare
-      if (html.includes('cf-challenge') || html.includes('cloudflare') || html.includes('captcha')) {
         return new Response(
-          JSON.stringify({ 
-            error: "blocking", 
-            message: "El origen de datos está bloqueando temporalmente la lectura (Rate Limit / Cloudflare). Por favor, intenta sugerir este enlace en unos minutos." 
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: `api_error`, message: `Error al consultar Lu.ma (HTTP ${statusCode})` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-    }
-    
-    // 2. Extraer __NEXT_DATA__ y fallbacks de HTML usando Cheerio (seguro contra backtracking de RegExp)
-    const $ = cheerio.load(html);
-    const nextDataStr = $('#__NEXT_DATA__').html();
-    let eventContainer = null;
 
-    if (nextDataStr) {
-      try {
-        eventContainer = findEventContainer(JSON.parse(nextDataStr));
-      } catch (err) {
-        console.warn("Error parseando __NEXT_DATA__ JSON:", err);
+      apiData = await response.json();
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutId);
+      if (fetchErr.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ error: "timeout", message: "La API de Lu.ma tardó demasiado en responder. Por favor, intenta de nuevo." }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
+      throw fetchErr;
     }
 
-    const rawEvent = eventContainer?.api_event || eventContainer?.event;
+    // Validate we got event data
+    const eventContainer = apiData?.data;
+    if (!eventContainer) {
+      return new Response(
+        JSON.stringify({ error: "parse_error", message: "No se pudo interpretar la respuesta de Lu.ma." }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Fallbacks limpios basados en Cheerio
-    const pageTitle = $('title').text().trim() || 'Evento de Luma';
-    const bodyText = $('body').text().replace(/\s+/g, ' ').slice(0, 3000) || '';
+    const rawEvent = eventContainer.event;
 
-    const title = rawEvent?.name || pageTitle;
+    // 2. Extraer datos directamente del JSON de la API (sin scraping HTML)
+    const title = rawEvent?.name || 'Evento de Luma';
     
-    // Obtener la descripción priorizando el div content dentro de event-about-card o spark-content
-    let contentText = $('.event-about-card .content').text().trim();
-    if (!contentText) {
-      contentText = $('.event-about-card').text().replace(/^About Event/i, '').trim();
+    // Descripción: extraer de description_mirror (TipTap JSON) o fallback
+    let description = '';
+    if (eventContainer.description_mirror) {
+      description = extractPlainText(eventContainer.description_mirror);
     }
-    if (!contentText) {
-      contentText = $('.spark-content').text().trim();
+    if (!description && rawEvent?.description) {
+      description = rawEvent.description;
     }
-    if (!contentText) {
-      contentText = $('.content').text().trim();
-    }
-    const description = contentText || rawEvent?.description || bodyText;
-
-    const rawLocation = rawEvent?.location?.address || 
-                        rawEvent?.location?.name || 
-                        rawEvent?.geo_address_info?.full_address || 
-                        rawEvent?.geo_address_info?.address || 
-                        'Virtual';
-
-    // 3. Extracción de Flyer, Host, y Precio
-    let coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || '';
-    if (!coverUrl) {
-      coverUrl = $('meta[property="og:image"]').attr('content') || 
-                 $('meta[name="twitter:image"]').attr('content') || 
-                 '';
+    if (!description) {
+      description = title;
     }
 
-    // Extracción de hosts
+    const rawLocation = rawEvent?.geo_address_info?.full_address || 
+                        rawEvent?.geo_address_info?.address ||
+                        rawEvent?.geo_address_info?.short_address ||
+                        (rawEvent?.location_type === 'online' ? 'Virtual' : 'Virtual');
+
+    // 3. Extracción de Flyer, Host, y Precio directamente del JSON
+    const coverUrl = rawEvent?.cover_url || rawEvent?.social_image_url || 
+                     eventContainer?.social_image?.cdn_url || '';
+
+    // Hosts directamente del array de la API
     let hostNames: string[] = [];
-    const htmlHosts: string[] = [];
-    
-    const hostRowElements = $('.hosts .host-row');
-    if (hostRowElements.length > 0) {
-      hostRowElements.each((_, el) => {
-        let name = $(el).find('.fw-medium, .text-ellipses, [class*="name"]').first().text().trim();
-        if (!name) {
-          name = $(el).text().trim();
-        }
-        if (name && name.length > 2 && name.length < 100) {
-          const lower = name.toLowerCase();
-          if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
-            htmlHosts.push(name);
-          }
-        }
-      });
-    }
-
-    if (htmlHosts.length === 0) {
-      $('.hosts').each((_, hostsContainer) => {
-        const links = $(hostsContainer).find('a');
-        if (links.length > 0) {
-          links.each((_, link) => {
-            let name = $(link).find('.text-ellipses, .fw-medium, [class*="name"]').first().text().trim();
-            if (!name) {
-              name = $(link).text().trim();
-            }
-            if (name && name.length > 2 && name.length < 100) {
-              const lower = name.toLowerCase();
-              if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
-                htmlHosts.push(name);
-              }
-            }
-          });
-        } else {
-          $(hostsContainer).find('.text-ellipses, .fw-medium, span, h3, h4').each((_, textEl) => {
-            const name = $(textEl).text().trim();
-            if (name && name.length > 2 && name.length < 100) {
-              const lower = name.toLowerCase();
-              if (!lower.includes('organizado') && !lower.includes('host') && !lower.includes('ver perfil') && !htmlHosts.includes(name)) {
-                htmlHosts.push(name);
-              }
-            }
-          });
-        }
-      });
-    }
-
-    if (htmlHosts.length > 0) {
-      hostNames = htmlHosts;
-    } else {
-      if (eventContainer?.hosts && Array.isArray(eventContainer.hosts)) {
-        hostNames = eventContainer.hosts.map((h: any) => h.name).filter(Boolean);
-      } else if (eventContainer?.calendar?.name) {
-        hostNames = [eventContainer.calendar.name];
-      }
+    if (eventContainer?.hosts && Array.isArray(eventContainer.hosts)) {
+      hostNames = eventContainer.hosts.map((h: any) => h.name || `${h.first_name || ''} ${h.last_name || ''}`.trim()).filter(Boolean);
+    } else if (eventContainer?.calendar?.name) {
+      hostNames = [eventContainer.calendar.name];
     }
 
     let hostName = '';
@@ -325,6 +230,7 @@ serve(async (req) => {
         priceStr = 'De pago';
       }
     }
+
 
     // 4. Fechas y Horas locales precalculadas a ART (User target timezone)
     const rawStartDate = rawEvent?.start_at;
